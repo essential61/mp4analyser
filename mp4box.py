@@ -68,7 +68,7 @@ class Header:
         start_of_box = fp.tell()
         self._size = struct.unpack('>I', fp.read(4))[0]
         self.type = fp.read(4).decode('utf-8')
-        if self.size == 1:
+        if self._size == 1:
             self._largesize = struct.unpack('>Q', fp.read(8))[0]
         if self.type == 'uuid':
             self.uuid = fp.read(16)
@@ -84,7 +84,7 @@ class Header:
 
     def get_header(self):
         ret_header = {"size": self._size, "type": self.type}
-        if self.size == 1:
+        if self._size == 1:
             ret_header['largesize'] = self._largesize
         if self.type == 'uuid':
             ret_header['uuid'] = self.uuid
@@ -109,7 +109,7 @@ class FtypBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         self.box_info = {'major_brand': fp.read(4).decode('utf-8'),
-                         'minor_version': "".join([str(int(b)).zfill(2) for b in fp.read(4)]),
+                         'minor_version': "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0]),
                          'compatible_brands': []}
         bytes_left = self.size - (self.header.header_size + 8)
         while bytes_left > 0:
@@ -168,8 +168,8 @@ class MvhdBox(Mp4FullBox):
                 '%Y-%m-%d %H:%M:%S')
             self.box_info['timescale'] = struct.unpack('>I', fp.read(4))[0]
             self.box_info['duration'] = struct.unpack('>I', fp.read(4))[0]
-        self.box_info['rate'] = hex(struct.unpack('>I', fp.read(4))[0])
-        self.box_info['volume'] = hex(struct.unpack('>H', fp.read(2))[0])
+        self.box_info['rate'] = "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0])
+        self.box_info['volume'] = "{0:#06x}".format(struct.unpack('>H', fp.read(2))[0])
         fp.seek(10, 1)
         self.box_info['matrix'] = [hex(int(b)) for b in struct.unpack('>9I', fp.read(36))]
         fp.seek(24, 1)
@@ -228,14 +228,14 @@ class TkhdBox(Mp4FullBox):
             fp.seek(4, 1)
             self.box_info['duration'] = struct.unpack('>I', fp.read(4))[0]
         fp.seek(8, 1)
-        self.box_info['layer'] = hex(struct.unpack('>H', fp.read(2))[0])
-        self.box_info['alternate_group'] = hex(struct.unpack('>H', fp.read(2))[0])
-        self.box_info['volume'] = hex(struct.unpack('>H', fp.read(2))[0])
+        self.box_info['layer'] = struct.unpack('>h', fp.read(2))[0]
+        self.box_info['alternate_group'] = struct.unpack('>h', fp.read(2))[0]
+        self.box_info['volume'] = "{0:#06x}".format(struct.unpack('>H', fp.read(2))[0])
         fp.seek(2, 1)
         self.box_info['matrix'] = [hex(int(b)) for b in struct.unpack('>9I', fp.read(36))]
         fp.seek(24, 1)
-        self.box_info['width'] = struct.unpack('>I', fp.read(4))[0]
-        self.box_info['height'] = struct.unpack('>I', fp.read(4))[0]
+        self.box_info['width'] = "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0])
+        self.box_info['height'] = "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0])
         fp.seek(self.start_of_box)
 
 
@@ -291,7 +291,7 @@ class MdhdBox(Mp4FullBox):
             self.box_info['timescale'] = struct.unpack('>I', fp.read(4))[0]
             fp.seek(4, 1)
             self.box_info['duration'] = struct.unpack('>I', fp.read(4))[0]
-        self.box_info['language'] = bin(struct.unpack('>H', fp.read(2))[0])
+        self.box_info['language'] = struct.unpack('>H', fp.read(2))[0]
         fp.seek(self.start_of_box)
 
 
@@ -409,8 +409,8 @@ class VmhdBox(Mp4FullBox):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
-        self.box_info['graphicsmode'] = bin(struct.unpack('>H', fp.read(2))[0])
-        self.box_info['opcolor'] = "".join([str(format(b, 'x')).zfill(2) for b in struct.unpack('>3B', fp.read(3))])
+        self.box_info['graphicsmode'] = struct.unpack('>H', fp.read(2))[0]
+        self.box_info['opcolor'] = struct.unpack('>3H', fp.read(6))
         fp.seek(self.start_of_box)
 
 
@@ -421,5 +421,5 @@ class SmhdBox(Mp4FullBox):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
-        self.box_info['balance'] = bin(struct.unpack('>H', fp.read(2))[0])
+        self.box_info['balance'] = struct.unpack('>h', fp.read(2))[0]
         fp.seek(self.start_of_box)

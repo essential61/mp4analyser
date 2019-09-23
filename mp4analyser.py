@@ -4,6 +4,35 @@ import os
 from tkinter import *
 from tkinter import ttk
 from tkinter import filedialog
+try:
+    from idlelib.redirector import WidgetRedirector
+except ImportError:
+    raise Exception("Python > 3.6 needed. Also idle3 needs to be installed on your system")
+
+
+# From http://effbot.org/zone/tkinter-autoscrollbar.htm
+# a scrollbar that hides itself if it's not needed.  only
+# works if you use the grid geometry manager.
+class AutoScrollbar(ttk.Scrollbar):
+
+    def set(self, lo, hi):
+        if float(lo) <= 0.0 and float(hi) >= 1.0:
+            # grid_remove is currently missing from Tkinter!
+            self.tk.call("grid", "remove", self)
+        else:
+            self.grid()
+        Scrollbar.set(self, lo, hi)
+
+
+# See https://stackoverflow.com/questions/3842155/is-there-a-way-to-make-the-tkinter-text-widget-read-only
+# note idle3 dependency
+class ReadOnlyText(Text):
+
+    def __init__(self, *args, **kwargs):
+        Text.__init__(self, *args, **kwargs)
+        self.redirector = WidgetRedirector(self)
+        self.insert = self.redirector.register("insert", lambda *args, **kw: "break")
+        self.delete = self.redirector.register("delete", lambda *args, **kw: "break")
 
 
 class MyApp(Tk):
@@ -45,7 +74,8 @@ class MyApp(Tk):
         self.tree = ttk.Treeview(self.f1, show="tree")
         self.tree.grid(column=0, row=0, sticky=(N, W, E, S))
         self.tree.column("#0", width=250)
-        self.scroll = ttk.Scrollbar(self.f1, orient=VERTICAL, command=self.tree.yview)
+        # Sub-classed auto hiding scroll bar
+        self.scroll = AutoScrollbar(self.f1, orient=VERTICAL, command=self.tree.yview)
         self.scroll.grid(column=1, row=0, sticky=(N, S))
         self.tree['yscrollcommand'] = self.scroll.set
         self.tree.bind('<ButtonRelease-1>', self.select_box)
