@@ -125,7 +125,7 @@ class MoovBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         bytes_left = self.size - self.header.header_size
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
             if current_header.type == 'mvhd':
@@ -184,18 +184,60 @@ class TrakBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         bytes_left = self.size - self.header.header_size
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
             if current_header.type == 'tkhd':
                 current_box = TkhdBox(fp, Header(fp))
             elif current_header.type == 'mdia':
                 current_box = MdiaBox(fp, Header(fp))
+            elif current_header.type == 'edts':
+                current_box = EdtsBox(fp, Header(fp))
             else:
                 current_box = UndefinedBox(fp, Header(fp))
             fp.seek(saved_file_position + current_box.size)
             self.child_boxes.append(current_box)
             bytes_left -= current_box.size
+        fp.seek(self.start_of_box)
+
+
+class EdtsBox(Mp4Box):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        bytes_left = self.size - self.header.header_size
+        while bytes_left > 7:
+            saved_file_position = fp.tell()
+            current_header = Header(fp)
+            if current_header.type == 'elst':
+                current_box = ElstBox(fp, Header(fp))
+            else:
+                current_box = UndefinedBox(fp, Header(fp))
+            fp.seek(saved_file_position + current_box.size)
+            self.child_boxes.append(current_box)
+            bytes_left -= current_box.size
+        fp.seek(self.start_of_box)
+
+
+class ElstBox(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
+        self.box_info['entry_count'] = struct.unpack('>I', fp.read(4))[0]
+        for i in range(self.box_info['entry_count']):
+            if self.box_info['version'] == 1:
+                self.box_info['segment_duration'] = struct.unpack('>Q', fp.read(8))[0]
+                self.box_info['media_time'] = struct.unpack('>q', fp.read(8))[0]
+            else:
+                self.box_info['segment_duration'] = struct.unpack('>I', fp.read(4))[0]
+                self.box_info['media_time'] = struct.unpack('>i', fp.read(4))[0]
+            self.box_info['media_rate_integer'] = struct.unpack('>h', fp.read(2))[0]
+            self.box_info['media_rate_fraction'] = struct.unpack('>h', fp.read(2))[0]
         fp.seek(self.start_of_box)
 
 
@@ -246,7 +288,7 @@ class MdiaBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         bytes_left = self.size - self.header.header_size
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
             if current_header.type == 'mdhd':
@@ -302,16 +344,17 @@ class MinfBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         bytes_left = self.size - self.header.header_size
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
-            # do stuff here
             if current_header.type == 'nmhd':
-                current_box = MdhdBox(fp, Header(fp))
+                current_box = NmhdBox(fp, Header(fp))
             elif current_header.type == 'vmhd':
                 current_box = VmhdBox(fp, Header(fp))
             elif current_header.type == 'smhd':
                 current_box = SmhdBox(fp, Header(fp))
+            elif current_header.type == 'dinf':
+                current_box = DinfBox(fp, Header(fp))
             elif current_header.type == 'stbl':
                 current_box = StblBox(fp, Header(fp))
             else:
@@ -319,6 +362,75 @@ class MinfBox(Mp4Box):
             fp.seek(saved_file_position + current_box.size)
             self.child_boxes.append(current_box)
             bytes_left -= current_box.size
+        fp.seek(self.start_of_box)
+
+
+class DinfBox(Mp4Box):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        bytes_left = self.size - self.header.header_size
+        while bytes_left > 7:
+            saved_file_position = fp.tell()
+            current_header = Header(fp)
+            if current_header.type == 'dref':
+                current_box = DrefBox(fp, Header(fp))
+            else:
+                current_box = UndefinedBox(fp, Header(fp))
+            fp.seek(saved_file_position + current_box.size)
+            self.child_boxes.append(current_box)
+            bytes_left -= current_box.size
+        fp.seek(self.start_of_box)
+
+
+class DrefBox(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
+        self.box_info['entry_count'] = struct.unpack('>I', fp.read(4))[0]
+        for i in range(self.box_info['entry_count']):
+            saved_file_position = fp.tell()
+            current_header = Header(fp)
+            if current_header.type == 'url ':
+                current_box = UrlBox(fp, Header(fp))
+            elif current_header.type == 'urn ':
+                current_box = UrnBox(fp, Header(fp))
+            else:
+                current_box = UndefinedBox(fp, Header(fp))
+            fp.seek(saved_file_position + current_box.size)
+            self.child_boxes.append(current_box)
+        fp.seek(self.start_of_box)
+
+
+class UrlBox(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
+        if int(self.box_info['flags'][-1]) != 1:
+            data_entry = fp.read(self.size - (self.header.header_size + 4))
+            self.box_info['location'] = data_entry.decode('utf-8', errors="ignore")
+        fp.seek(self.start_of_box)
+
+
+class UrnBox(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
+        if int(self.box_info['flags'][-1]) != 1:
+            name, ignore, location = fp.read(self.size - (self.header.header_size + 4)).partition(b'\x00')
+            self.box_info['name'] = location.decode('utf-8', errors="ignore")
+            self.box_info['location'] = location.decode('utf-8', errors="ignore")
         fp.seek(self.start_of_box)
 
 
@@ -344,7 +456,7 @@ class UdtaBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         bytes_left = self.size - self.header.header_size
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
             if current_header.type == 'meta':
@@ -365,7 +477,7 @@ class MetaBox(Mp4FullBox):
         fp.seek(self.header.header_size, 1)
         self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
         bytes_left = self.size - (self.header.header_size + 4)
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
             if current_header.type == 'hdlr':
@@ -385,17 +497,17 @@ class StblBox(Mp4Box):
         self.start_of_box = fp.tell()
         fp.seek(self.header.header_size, 1)
         bytes_left = self.size - self.header.header_size
-        while bytes_left > 0:
+        while bytes_left > 7:
             saved_file_position = fp.tell()
             current_header = Header(fp)
-            # if current_header.type == 'mdhd':
-            #    current_box = MdhdBox(fp, Header(fp))
+            if current_header.type == 'stsd':
+                current_box = StsdBox(fp, Header(fp))
             # elif current_header.type == 'hdlr':
             #    current_box = HdlrBox(fp, Header(fp))
             # elif current_header.type == 'minf':
             #    current_box = MinfBox(fp, Header(fp))
-            # else:
-            current_box = UndefinedBox(fp, Header(fp))
+            else:
+                current_box = UndefinedBox(fp, Header(fp))
             fp.seek(saved_file_position + current_box.size)
             self.child_boxes.append(current_box)
             bytes_left -= current_box.size
@@ -422,4 +534,80 @@ class SmhdBox(Mp4FullBox):
         fp.seek(self.header.header_size, 1)
         self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
         self.box_info['balance'] = struct.unpack('>h', fp.read(2))[0]
+        fp.seek(self.start_of_box)
+
+
+class NmhdBox(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
+        fp.seek(self.start_of_box)
+
+
+class StsdBox(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info = self.set_version_and_flags(struct.unpack('>I', fp.read(4))[0])
+        self.box_info['entry_count'] = struct.unpack('>I', fp.read(4))[0]
+        for i in range(self.box_info['entry_count']):
+            current_header = Header(fp)
+            if current_header.type == 'avc1':
+                current_box = Avc1Box(fp, Header(fp))
+            else:
+                current_box = UndefinedBox(fp, Header(fp))
+            self.child_boxes.append(current_box)
+        fp.seek(self.start_of_box)
+
+
+class Avc1Box(Mp4FullBox):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        fp.seek(24, 1)
+        self.box_info['width'] = struct.unpack('>H', fp.read(2))[0]
+        self.box_info['height'] = struct.unpack('>H', fp.read(2))[0]
+        self.box_info['horizresolution'] = "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0])
+        self.box_info['vertresolution'] = "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0])
+        fp.seek(4, 1)
+        self.box_info['frame_count'] = struct.unpack('>H', fp.read(2))[0]
+        self.box_info['compressorname'] = "{0:#010x}".format(struct.unpack('>I', fp.read(4))[0])
+        # a 16-bit int value of -1 seems to be used as a marker in front of any child boxes
+        bytes_left = self.start_of_box + self.size - fp.tell()
+        while bytes_left > 0 and struct.unpack('>h', fp.read(2))[0] != -1:
+            bytes_left -= 2
+        fp.seek(-4, 1)
+        self.box_info['depth'] = "{0:#06x}".format(struct.unpack('>H', fp.read(2))[0])
+        self.box_info['pre-defined'] = struct.unpack('>h', fp.read(2))[0]
+        # need to check this is correct
+        while bytes_left > 7:
+            saved_file_position = fp.tell()
+            current_header = Header(fp)
+            if current_header.type == 'avcC':
+                current_box = AvcCBox(fp, Header(fp))
+            else:
+                current_box = UndefinedBox(fp, Header(fp))
+            fp.seek(saved_file_position + current_box.size)
+            self.child_boxes.append(current_box)
+            bytes_left -= current_box.size
+        fp.seek(self.start_of_box)
+
+
+class AvcCBox(Mp4Box):
+
+    def __init__(self, fp, header):
+        super().__init__(header)
+        self.start_of_box = fp.tell()
+        fp.seek(self.header.header_size, 1)
+        self.box_info['configuration_version'] = struct.unpack('>B', fp.read(1))[0]
+        self.box_info['avc_profile_indication'] = struct.unpack('>B', fp.read(1))[0]
+        self.box_info['avc_compatibility'] = struct.unpack('>B', fp.read(1))[0]
+        self.box_info['avc_level_indication'] = struct.unpack('>B', fp.read(1))[0]
         fp.seek(self.start_of_box)

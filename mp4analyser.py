@@ -108,6 +108,14 @@ class MyApp(Tk):
                             for l5, this_box in enumerate(this_box.child_boxes):
                                 l5_iid = "{0}.{1}.{2}.{3}.{4}.{5}".format(l0, l1, l2, l3, l4, l5)
                                 self.tree.insert(l4_iid, 'end', l5_iid, text=l5_iid + " " + this_box.type, open=TRUE)
+                                for l6, this_box in enumerate(this_box.child_boxes):
+                                    l6_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}".format(l0, l1, l2, l3, l4, l5, l6)
+                                    self.tree.insert(l5_iid, 'end', l6_iid, text=l6_iid + " " + this_box.type,
+                                                     open=TRUE)
+                                    for l7, this_box in enumerate(this_box.child_boxes):
+                                        l7_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}".format(l0, l1, l2, l3, l4, l5, l6, l7)
+                                        self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
+                                                         open=TRUE)
 
     def select_box(self, a):
         my_id = self.tree.focus()
@@ -132,6 +140,16 @@ class MyApp(Tk):
                 self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
                     int(my_id[4])].child_boxes[
                     int(my_id[6])].child_boxes[int(my_id[8])].child_boxes[int(my_id[10])]
+        elif len(my_id) == 13:
+            box_selected = \
+                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
+                    int(my_id[4])].child_boxes[
+                    int(my_id[6])].child_boxes[int(my_id[8])].child_boxes[int(my_id[10])].child_boxes[int(my_id[12])]
+        elif len(my_id) == 15:
+            box_selected = \
+                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
+                    int(my_id[4])].child_boxes[
+                    int(my_id[6])].child_boxes[int(my_id[8])].child_boxes[int(my_id[10])].child_boxes[int(my_id[12])].child_boxes[int(my_id[14])]
         self.populate_text_widget(box_selected)
 
     def populate_text_widget(self, box_selected):
