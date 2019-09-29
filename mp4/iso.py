@@ -87,6 +87,8 @@ def box_factory(fp, header):
         the_box = PadbBox(fp, header)
     elif header.type == 'stdp':
         the_box = StdpBox(fp, header)
+    elif header.type == 'sdtp':
+        the_box = SdtpBox(fp, header)
     elif header.type == 'sbgp':
         the_box = SbgpBox(fp, header)
 #    elif header.type == 'sgpd':
