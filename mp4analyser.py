@@ -1,9 +1,10 @@
-import mp4box
 import os
-
 from tkinter import *
-from tkinter import ttk
 from tkinter import filedialog
+from tkinter import ttk
+
+import mp4.iso
+
 try:
     from idlelib.redirector import WidgetRedirector
 except ImportError:
@@ -40,6 +41,7 @@ class MyApp(Tk):
     def __init__(self):
         super().__init__()
         self.mp4file = None
+        self.dialog_dir = os.path.expanduser("~")
         # build ui
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
@@ -59,12 +61,12 @@ class MyApp(Tk):
         self.p.grid(column=0, row=0, sticky=(N, W, E, S))
 
         # first pane, which would get widgets gridded into it:
-        self.f1 = ttk.Labelframe(self.p, text='Pane1')
+        self.f1 = ttk.Labelframe(self.p, text='Box Hierarchy')
         self.f1.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f1.columnconfigure(0, weight=1)
         self.f1.rowconfigure(0, weight=1)
 
-        self.f2 = ttk.Labelframe(self.p, text='Pane2')  # second pane
+        self.f2 = ttk.Labelframe(self.p, text='Box Details')  # second pane
         self.f2.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f2.columnconfigure(0, weight=1)
         self.f2.rowconfigure(0, weight=1)
@@ -74,22 +76,30 @@ class MyApp(Tk):
         self.tree = ttk.Treeview(self.f1, show="tree")
         self.tree.grid(column=0, row=0, sticky=(N, W, E, S))
         self.tree.column("#0", width=250)
+
         # Sub-classed auto hiding scroll bar
-        self.scroll = AutoScrollbar(self.f1, orient=VERTICAL, command=self.tree.yview)
-        self.scroll.grid(column=1, row=0, sticky=(N, S))
-        self.tree['yscrollcommand'] = self.scroll.set
+        self.scroll1 = AutoScrollbar(self.f1, orient=VERTICAL, command=self.tree.yview)
+        self.scroll1.grid(column=1, row=0, sticky=(N, S))
+        self.tree['yscrollcommand'] = self.scroll1.set
         self.tree.bind('<ButtonRelease-1>', self.select_box)
 
-        self.t = Text(self.f2, state='disabled', width=80, height=24, wrap='none')
+        self.t = ReadOnlyText(self.f2, state='normal', width=80, height=24, wrap='none')
         self.t.grid(column=0, row=0, sticky=(N, W, E, S))
+
+        # Sub-classed auto hiding scroll bar
+        self.scroll2 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.t.yview)
+        self.scroll2.grid(column=1, row=0, sticky=(N, S))
+        self.t['yscrollcommand'] = self.scroll2.set
 
     def open_file(self):
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", "*.mp4"), ("All Files", "*.*")),
-                                              initialdir=os.path.expanduser("~"))
-        self.mp4file = mp4box.Mp4File(filename)
-        self.title("MP4 Analyser" + " - " + os.path.basename(filename))
-        # Clear tree if not empty
+                                              initialdir=self.dialog_dir)
+        self.mp4file = mp4.iso.Mp4File(filename)
+        self.dialog_dir, filenamebase = os.path.split(filename)
+        self.title("MP4 Analyser" + " - " + filenamebase)
+        # Clear tree and text widget if not empty
         self.tree.delete(*self.tree.get_children())
+        self.t.delete(1.0, END)
         # Now fill it with new contents
         for l0, this_box in enumerate(self.mp4file.child_boxes):
             self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
@@ -118,51 +128,41 @@ class MyApp(Tk):
                                                          open=TRUE)
 
     def select_box(self, a):
-        my_id = self.tree.focus()
-        if len(my_id) == 1:
-            box_selected = self.mp4file.child_boxes[int(my_id[0])]
-        elif len(my_id) == 3:
-            box_selected = self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])]
-        elif len(my_id) == 5:
-            box_selected = self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[int(my_id[4])]
-        elif len(my_id) == 7:
-            box_selected = \
-                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
-                    int(my_id[4])].child_boxes[
-                    int(my_id[6])]
-        elif len(my_id) == 9:
-            box_selected = \
-                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
-                    int(my_id[4])].child_boxes[
-                    int(my_id[6])].child_boxes[int(my_id[8])]
-        elif len(my_id) == 11:
-            box_selected = \
-                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
-                    int(my_id[4])].child_boxes[
-                    int(my_id[6])].child_boxes[int(my_id[8])].child_boxes[int(my_id[10])]
-        elif len(my_id) == 13:
-            box_selected = \
-                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
-                    int(my_id[4])].child_boxes[
-                    int(my_id[6])].child_boxes[int(my_id[8])].child_boxes[int(my_id[10])].child_boxes[int(my_id[12])]
-        elif len(my_id) == 15:
-            box_selected = \
-                self.mp4file.child_boxes[int(my_id[0])].child_boxes[int(my_id[2])].child_boxes[
-                    int(my_id[4])].child_boxes[
-                    int(my_id[6])].child_boxes[int(my_id[8])].child_boxes[int(my_id[10])].child_boxes[int(my_id[12])].child_boxes[int(my_id[14])]
+        # self.tree.focus() returns id in the form  n.n.n as text
+        l = [int(i) for i in self.tree.focus().split('.')]
+        box_selected = None
+        if len(l) == 1:
+            box_selected = self.mp4file.child_boxes[l[0]]
+        elif len(l) == 2:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]]
+        elif len(l) == 3:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]]
+        elif len(l) == 4:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[l[3]]
+        elif len(l) == 5:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]]
+        elif len(l) == 6:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]]
+        elif len(l) == 7:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]]
+        elif len(l) == 8:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
         self.populate_text_widget(box_selected)
 
     def populate_text_widget(self, box_selected):
-        self.t['state'] = 'normal'
         self.t.delete(1.0, END)
         self.t.insert(END, "Box is located at position " + "{0:#x}".format(box_selected.start_of_box) +
                       " from start of from file\n\n")
-        self.t.insert(END, "Has header " + box_selected.header.get_header() + "\n\n")
+        # N.B Modern Versions of Python preserve insertion order
+        self.t.insert(END, "Has header:\n" + box_selected.header.get_header() + "\n\n")
         if len(box_selected.box_info) > 0:
-            self.t.insert(END, "Has values " + box_selected.get_box_data() + "\n\n")
+            self.t.insert(END, "Has values:\n" + box_selected.get_box_data() + "\n\n")
         if len(box_selected.get_children()) > 0:
-            self.t.insert(END, "Has child boxes " + box_selected.get_children() + "\n\n")
-        self.t['state'] = 'disabled'
+            self.t.insert(END, "Has child boxes:\n" + box_selected.get_children() + "\n\n")
 
 
 if __name__ == '__main__':
