@@ -46,7 +46,7 @@ class MyApp(Tk):
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
-        self.geometry('900x600')
+        self.geometry('1000x600')
         self.option_add('*tearOff', FALSE)
         self.menubar = Menu(self)
 
@@ -75,7 +75,7 @@ class MyApp(Tk):
 
         self.tree = ttk.Treeview(self.f1, show="tree")
         self.tree.grid(column=0, row=0, sticky=(N, W, E, S))
-        self.tree.column("#0", width=250)
+        self.tree.column("#0", width=300)
 
         # Sub-classed auto hiding scroll bar
         self.scroll1 = AutoScrollbar(self.f1, orient=VERTICAL, command=self.tree.yview)

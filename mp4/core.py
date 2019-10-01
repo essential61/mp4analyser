@@ -3,8 +3,9 @@ from mp4.util import *
 
 class Mp4Box:
 
-    def __init__(self, header):
+    def __init__(self, header, parent):
         self.header = header
+        self.parent = parent
         self.start_of_box = 0
         self.child_boxes = []
         self.box_info = {}
@@ -26,8 +27,8 @@ class Mp4Box:
 
 class Mp4FullBox(Mp4Box):
 
-    def __init__(self, header):
-        super().__init__(header)
+    def __init__(self, header, parent):
+        super().__init__(header, parent)
 
     def set_version_and_flags(self, fp):
         four_bytes = read_u32(fp)
