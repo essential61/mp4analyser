@@ -177,7 +177,7 @@ def box_factory(fp, header):
 #        the_box = GitnBox(fp, header)
 #    elif header.type == 'idat':
 #        the_box = IdatBox(fp, header)
-#    elif header.type == 'Iref:
+#    elif header.type == 'iref:
 #       the_box = IrefBox(fp, header)
 #    elif header.type == 'meco':
 #        the_box = MecoBox(fp, header)
@@ -223,6 +223,9 @@ class UndefinedBox(Mp4Box):
     def __init__(self, fp, header):
         super().__init__(header)
         self.start_of_box = fp.tell()
+        try:
+            pass
+        finally:
 
 
 FreeBox = UndefinedBox
@@ -400,7 +403,7 @@ class TkhdBox(Mp4FullBox):
         self.box_info['alternate_group'] = read_i16(fp)
         self.box_info['volume'] = read_u8_8(fp)
         fp.seek(2, 1)
-        self.box_info['matrix'] = [hex(int(b)) for b in struct.unpack('>9I', fp.read(36))]
+        self.box_info['matrix'] = ["{0:#010x}".format(b) for b in struct.unpack('>9I', fp.read(36))]
         fp.seek(24, 1)
         self.box_info['width'] = read_u16_16(fp)
         self.box_info['height'] = read_u16_16(fp)
@@ -509,7 +512,15 @@ class MdhdBox(Mp4FullBox):
             self.box_info['timescale'] = read_u32(fp)
             fp.seek(4, 1)
             self.box_info['duration'] = read_u32(fp)
-        self.box_info['language'] = struct.unpack('>H', fp.read(2))[0]
+        # I think this is right
+        lang = struct.unpack('>H', fp.read(2))[0]
+        if lang == 0:
+            self.box_info['language'] = '0x00'
+        else:
+            ch1 = str(chr(60 + (lang % 32768 // 1024)))
+            ch2 = str(chr(60 + (lang % 1024 // 32)))
+            ch3 = str(chr(60 + (lang % 32)))
+            self.box_info['language'] = ch1 + ch2 + ch3
         fp.seek(self.start_of_box)
 
 
@@ -521,7 +532,7 @@ class ElngBox(Mp4FullBox):
         end_of_box = self.start_of_box + self.size
         fp.seek(self.header.header_size, 1)
         self.box_info = self.set_version_and_flags(fp)
-        self.box_info['extended_language'], ignore, ignore = fp.read(self.size - (self.header.header_size + 4)).partition(b'\x00')
+        self.box_info['extended_language'] = fp.read(self.size - (self.header.header_size + 4)).split(b'\x00')[0]
         fp.seek(self.start_of_box)
 
 
@@ -945,7 +956,13 @@ class SdtpBox(Mp4FullBox):
         fp.seek(self.start_of_box + self.header.header_size + 4)
         self.box_info['sample_list'] = []
         for i in range(sc):
-            self.box_info['sample_list'].append({'priority': "{0:#04x}".format(read_u8(fp))})
+            the_byte = read_u8(fp)
+            is_leading = the_byte // 64
+            depends_on = (the_byte % 64) // 16
+            is_depended_on = (the_byte % 16) // 4
+            has_redundancy = the_byte % 4
+            self.box_info['sample_list'].append({'is_leading': is_leading, 'sample_depends_on': depends_on,
+                                    'sample_is_depended_on': is_depended_on, 'sample_has_redundancy': has_redundancy})
         fp.seek(fp_orig)
 
 
