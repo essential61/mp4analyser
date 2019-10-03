@@ -1,17 +1,21 @@
-import json
 from mp4.util import *
+
 
 class Mp4Box:
 
-    def __init__(self, header, parent):
+    def __init__(self, fp, header, parent):
         self.header = header
         self.parent = parent
-        self.start_of_box = 0
+        self.start_of_box = fp.tell()
         self.child_boxes = []
         self.box_info = {}
-
-    def get_box_data(self):
-        return json.dumps(self.box_info, indent=4) if len(self.box_info) > 0 else ""
+        self.byte_string = None
+        if parent.type == 'file':
+            if self.type == 'mdat' and self.size > 10000000:
+                self.byte_string = fp.read(10000000)
+            else:
+                self.byte_string = fp.read(self.size)
+            fp.seek(self.start_of_box)
 
     @property
     def size(self):
@@ -21,14 +25,25 @@ class Mp4Box:
     def type(self):
         return self.header.type
 
-    def get_children(self):
-        return json.dumps([box.type for box in self.child_boxes]) if len(self.child_boxes) > 0 else ""
+    def get_children_types(self):
+        return [box.type for box in self.child_boxes]
+
+    def get_top(self):
+        if self.parent.type == 'file':
+            return self
+        else:
+            return self.parent.get_top()
+
+    def get_hex_view(self):
+        top_box = self.get_top()
+        offset = self.start_of_box - top_box.start_of_box
+        return top_box.byte_string[offset:offset + self.size]
 
 
 class Mp4FullBox(Mp4Box):
 
-    def __init__(self, header, parent):
-        super().__init__(header, parent)
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
 
     def set_version_and_flags(self, fp):
         four_bytes = read_u32(fp)
@@ -64,5 +79,4 @@ class Header:
             ret_header['largesize'] = self._largesize
         if self.type == 'uuid':
             ret_header['uuid'] = self.uuid
-        return json.dumps(ret_header, indent=4)
-
+        return ret_header

@@ -26,10 +26,9 @@ Boxes not Defined in ISO BMFF
 class UndefinedBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
-            pass
+            self.box_info['message'] = 'TODO'
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -37,8 +36,7 @@ class UndefinedBox(Mp4Box):
 class Avc1Box(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size + 24, 1)
             self.box_info['width'] = read_u16(fp)
@@ -57,7 +55,6 @@ class Avc1Box(Mp4FullBox):
             self.box_info['pre-defined'] = read_i16(fp)
             # need to check this is correct
             while bytes_left > 7:
-                saved_file_position = fp.tell()
                 current_header = Header(fp)
                 current_box = mp4.iso.box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
@@ -69,8 +66,7 @@ class Avc1Box(Mp4FullBox):
 class AvcCBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info['configuration_version'] = read_u8(fp)
@@ -84,8 +80,7 @@ class AvcCBox(Mp4Box):
 class Mp4aBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size + 6, 1)
             self.box_info['reference_index'] = "{0:#06x}".format(read_u16(fp))
@@ -100,7 +95,6 @@ class Mp4aBox(Mp4FullBox):
             # need to check this is correct
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
-                saved_file_position = fp.tell()
                 current_header = Header(fp)
                 current_box = mp4.iso.box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
@@ -108,11 +102,11 @@ class Mp4aBox(Mp4FullBox):
         finally:
             fp.seek(self.start_of_box + self.size)
 
+
 class EsdsBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)

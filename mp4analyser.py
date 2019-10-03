@@ -1,4 +1,6 @@
 import os
+import json
+import binascii
 from tkinter import *
 from tkinter import filedialog
 from tkinter import ttk
@@ -46,7 +48,7 @@ class MyApp(Tk):
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
-        self.geometry('1000x600')
+        self.geometry('1050x600')
         self.option_add('*tearOff', FALSE)
         self.menubar = Menu(self)
 
@@ -66,7 +68,7 @@ class MyApp(Tk):
         self.f1.columnconfigure(0, weight=1)
         self.f1.rowconfigure(0, weight=1)
 
-        self.f2 = ttk.Labelframe(self.p, text='Box Details')  # second pane
+        self.f2 = ttk.Labelframe(self.p, text='Box Details', width=750,)  # second pane
         self.f2.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f2.columnconfigure(0, weight=1)
         self.f2.rowconfigure(0, weight=1)
@@ -83,13 +85,21 @@ class MyApp(Tk):
         self.tree['yscrollcommand'] = self.scroll1.set
         self.tree.bind('<ButtonRelease-1>', self.select_box)
 
-        self.t = ReadOnlyText(self.f2, state='normal', width=80, height=24, wrap='none')
+        self.t = ReadOnlyText(self.f2, state='normal', width=120, height=24, wrap='none')
         self.t.grid(column=0, row=0, sticky=(N, W, E, S))
 
         # Sub-classed auto hiding scroll bar
         self.scroll2 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.t.yview)
         self.scroll2.grid(column=1, row=0, sticky=(N, S))
         self.t['yscrollcommand'] = self.scroll2.set
+
+        self.thex = ReadOnlyText(self.f2, state='normal', width=120, height=15, wrap='none')
+        self.thex.grid(column=0, row=1, sticky=(N, W, E, S))
+
+        # Sub-classed auto hiding scroll bar
+        self.scroll3 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.thex.yview)
+        self.scroll3.grid(column=1, row=1, sticky=(N, S))
+        self.thex['yscrollcommand'] = self.scroll3.set
 
     def open_file(self):
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", "*.mp4"), ("All Files", "*.*")),
@@ -123,7 +133,8 @@ class MyApp(Tk):
                                     self.tree.insert(l5_iid, 'end', l6_iid, text=l6_iid + " " + this_box.type,
                                                      open=TRUE)
                                     for l7, this_box in enumerate(this_box.child_boxes):
-                                        l7_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}".format(l0, l1, l2, l3, l4, l5, l6, l7)
+                                        l7_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}".format(l0, l1, l2, l3, l4, l5, l6,
+                                                                                          l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
 
@@ -152,17 +163,32 @@ class MyApp(Tk):
             box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
                 l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
         self.populate_text_widget(box_selected)
+        self.populate_hex_text_widget(box_selected)
 
     def populate_text_widget(self, box_selected):
         self.t.delete(1.0, END)
-        self.t.insert(END, "Box is located at position " + "{0:#x}".format(box_selected.start_of_box) +
-                      " from start of from file\n\n")
-        # N.B Modern Versions of Python preserve insertion order
-        self.t.insert(END, "Has header:\n" + box_selected.header.get_header() + "\n\n")
+        my_string = "Box is located at position " + "{0:#x}".format(box_selected.start_of_box) + \
+                    " from start of from file\n\n"
+        my_string += "Has header:\n" + json.dumps(box_selected.header.get_header()) + "\n\n"
         if len(box_selected.box_info) > 0:
-            self.t.insert(END, "Has values:\n" + box_selected.get_box_data() + "\n\n")
-        if len(box_selected.get_children()) > 0:
-            self.t.insert(END, "Has child boxes:\n" + box_selected.get_children() + "\n\n")
+            # insertion order is preserved in modern Python
+            my_string += "Has values:\n" + json.dumps(box_selected.box_info, indent=4) + "\n\n"
+        if len(box_selected.child_boxes) > 0:
+            my_string += "Has child boxes:\n" + json.dumps(box_selected.get_children_types())
+        self.t.insert(END, my_string)
+
+    def populate_hex_text_widget(self, box_selected):
+        line_length = 64
+        self.thex.delete(1.0, END)
+        hex_bytes = binascii.hexlify(box_selected.get_hex_view())
+        hex_string = ''
+        for i in range(0, len(hex_bytes), line_length):
+            hex_line = hex_bytes[i:i + line_length].decode('utf-8')
+            pretty_hex_line = ''
+            for j in range(0, len(hex_line), 2):
+                pretty_hex_line += hex_line[j:j+2] + '-'
+            hex_string += pretty_hex_line + '\n'
+        self.thex.insert(END, hex_string)
 
 
 if __name__ == '__main__':

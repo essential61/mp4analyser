@@ -201,6 +201,7 @@ class Mp4File:
 
     def __init__(self, filename):
         self.filename = filename
+        self.type = 'file'
         self.child_boxes = []
         with open(filename, 'rb') as f:
             end_of_file = False
@@ -210,7 +211,6 @@ class Mp4File:
                 self.child_boxes.append(current_box)
                 if current_box.size == 0:
                     end_of_file = True
-                #f.seek(current_header.size, 1)
                 if len(f.read(4)) != 4:
                     end_of_file = True
                 else:
@@ -218,31 +218,30 @@ class Mp4File:
         f.close()
 
 
-class UndefinedBox(Mp4Box):
+class FreeBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             pass
         finally:
             fp.seek(self.start_of_box + self.size)
 
 
-FreeBox = UndefinedBox
-SkipBox = UndefinedBox
+SkipBox = FreeBox
 
 
 class FtypBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
-            self.box_info = {'major_brand': fp.read(4).decode('utf-8'),
-                         'minor_version': "{0:#010x}".format(read_u32(fp)),
-                         'compatible_brands': []}
+            self.box_info = {
+                            'major_brand': fp.read(4).decode('utf-8'),
+                            'minor_version': "{0:#010x}".format(read_u32(fp)),
+                            'compatible_brands': []
+                            }
             bytes_left = self.size - (self.header.header_size + 8)
             while bytes_left > 0:
                 self.box_info['compatible_brands'].append(fp.read(4).decode('utf-8'))
@@ -257,33 +256,29 @@ StypBox = FtypBox
 class PdinBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
+        end_of_box = self.start_of_box + self.size
         try:
-            end_of_box = self.start_of_box + self.size
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
             self.box_info['rates'] = []
             while fp.tell() < end_of_box:
                 self.box_info('rates').append({'rate': read_u32(fp), 'initial_delay': read_u32(fp)})
         finally:
-            fp.seek(self.end_of_box)
+            fp.seek(end_of_box)
 
 
 class ContainerBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             bytes_left = self.size - self.header.header_size
             while bytes_left > 7:
-                saved_file_position = fp.tell()
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
-                #fp.seek(saved_file_position + current_box.size)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -296,38 +291,33 @@ UdtaBox = TrgrBox = ContainerBox
 class MetaBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
             bytes_left = self.size - (self.header.header_size + 4)
             while bytes_left > 7:
-                saved_file_position = fp.tell()
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
-                #fp.seek(saved_file_position + current_box.size)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
 
 
 class MdatBox(Mp4Box):
-
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
-            self.box_info['message'] = 'Haven\'t decided what to display here'
+            self.box_info['message'] = 'If mdat > 10 MB only the first 10 MB will be shown in the hex view'
         finally:
             fp.seek(self.start_of_box + self.size)
+
 
 class MvhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -359,8 +349,7 @@ class MvhdBox(Mp4FullBox):
 class MfhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -372,8 +361,7 @@ class MfhdBox(Mp4FullBox):
 class ElstBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -394,8 +382,7 @@ class ElstBox(Mp4FullBox):
 class TkhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -432,8 +419,7 @@ class TkhdBox(Mp4FullBox):
 class TfhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -455,8 +441,7 @@ class TfhdBox(Mp4FullBox):
 class TrunBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -500,8 +485,7 @@ class TrunBox(Mp4FullBox):
 class TfdtBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -516,8 +500,7 @@ class TfdtBox(Mp4FullBox):
 class MdhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -554,8 +537,7 @@ class MdhdBox(Mp4FullBox):
 class ElngBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -567,18 +549,15 @@ class ElngBox(Mp4FullBox):
 class DrefBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
             self.box_info['entry_count'] = read_u32(fp)
             for i in range(self.box_info['entry_count']):
-                saved_file_position = fp.tell()
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
-                #fp.seek(saved_file_position + current_box.size)
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -586,8 +565,7 @@ class DrefBox(Mp4FullBox):
 class Url_Box(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -601,8 +579,7 @@ class Url_Box(Mp4FullBox):
 class Urn_Box(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -617,8 +594,7 @@ class Urn_Box(Mp4FullBox):
 class HdlrBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -634,8 +610,7 @@ class HdlrBox(Mp4FullBox):
 class StblBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             bytes_left = self.size - self.header.header_size
@@ -674,8 +649,7 @@ class StblBox(Mp4Box):
 class VmhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -688,8 +662,7 @@ class VmhdBox(Mp4FullBox):
 class SmhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -701,8 +674,7 @@ class SmhdBox(Mp4FullBox):
 class HmhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -717,8 +689,8 @@ class HmhdBox(Mp4FullBox):
 class NmhdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
+
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -729,8 +701,7 @@ class NmhdBox(Mp4FullBox):
 class StsdBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -746,15 +717,14 @@ class StsdBox(Mp4FullBox):
 class SttsBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
-                self.box_info['entry_list'].append({'sample_count':read_u32(fp), 'sample_delta':read_u32(fp)})
+                self.box_info['entry_list'].append({'sample_count': read_u32(fp), 'sample_delta': read_u32(fp)})
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -762,8 +732,7 @@ class SttsBox(Mp4FullBox):
 class CttsBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -781,8 +750,7 @@ class CttsBox(Mp4FullBox):
 class CslgBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -805,8 +773,7 @@ class CslgBox(Mp4FullBox):
 class StssBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -821,8 +788,7 @@ class StssBox(Mp4FullBox):
 class StscBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -841,8 +807,7 @@ class StscBox(Mp4FullBox):
 class StcoBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -857,8 +822,7 @@ class StcoBox(Mp4FullBox):
 class Co64Box(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -873,8 +837,7 @@ class Co64Box(Mp4FullBox):
 class PadbBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -890,8 +853,7 @@ class PadbBox(Mp4FullBox):
 class SubsBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -910,10 +872,17 @@ class SubsBox(Mp4FullBox):
                         subsample_priority = read_u8(fp)
                         discardable = read_u8(fp)
                         codec_specific_parameters = read_u32(fp)
-                        subsample_list.append({'subsample_size': subsample_size, 'subsample_priority': subsample_priority,
-                        'discardable': discardable, 'codec_specific_parameters': codec_specific_parameters})
-                    self.box_info['entry_list'].append({'sample_delta': sample_delta, 'subsample_count': subsample_count,
-                                                    'subsample_list': subsample_list})
+                        subsample_list.append({
+                                                'subsample_size': subsample_size,
+                                                'subsample_priority': subsample_priority,
+                                                'discardable': discardable,
+                                                'codec_specific_parameters': codec_specific_parameters
+                                              })
+                    self.box_info['entry_list'].append({
+                                                        'sample_delta': sample_delta,
+                                                        'subsample_count': subsample_count,
+                                                        'subsample_list': subsample_list
+                                                      })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -921,8 +890,7 @@ class SubsBox(Mp4FullBox):
 class SbgpBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -932,7 +900,10 @@ class SbgpBox(Mp4FullBox):
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
-                self.box_info['entry_list'].append({'sample_count': read_u32(fp), 'group_description_index': read_u32(fp)})
+                self.box_info['entry_list'].append({
+                                                    'sample_count': read_u32(fp),
+                                                    'group_description_index': read_u32(fp)
+                                                  })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -940,8 +911,7 @@ class SbgpBox(Mp4FullBox):
 class SaizBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -958,14 +928,13 @@ class SaizBox(Mp4FullBox):
 class StszBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
             self.box_info['sample_size'] = read_u32(fp)
             self.box_info['sample_count'] = read_u32(fp)
-            if  self.box_info['sample_size'] == 0:
+            if self.box_info['sample_size'] == 0:
                 self.box_info['entry_list'] = []
                 for i in range(self.box_info['sample_count']):
                     self.box_info['entry_list'].append({'entry_size': read_u32(fp)})
@@ -976,14 +945,13 @@ class StszBox(Mp4FullBox):
 class Stz2Box(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
             self.box_info['field_size'] = read_u32(fp)
             self.box_info['sample_count'] = read_u32(fp)
-            if  self.box_info['sample_size'] == 0:
+            if self.box_info['sample_size'] == 0:
                 self.box_info['entry_list'] = []
                 for i in range(self.box_info['sample_count']):
                     if self.box_info['field_size'] == 4:
@@ -1000,8 +968,7 @@ class Stz2Box(Mp4FullBox):
 class StdpBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -1020,8 +987,7 @@ class StdpBox(Mp4FullBox):
 class SdtpBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -1038,16 +1004,19 @@ class SdtpBox(Mp4FullBox):
             depends_on = (the_byte % 64) // 16
             is_depended_on = (the_byte % 16) // 4
             has_redundancy = the_byte % 4
-            self.box_info['sample_list'].append({'is_leading': is_leading, 'sample_depends_on': depends_on,
-                                    'sample_is_depended_on': is_depended_on, 'sample_has_redundancy': has_redundancy})
+            self.box_info['sample_list'].append({
+                                                'is_leading': is_leading,
+                                                'sample_depends_on': depends_on,
+                                                'sample_is_depended_on': is_depended_on,
+                                                'sample_has_redundancy': has_redundancy
+                                                })
         fp.seek(fp_orig)
 
 
 class SidxBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -1066,9 +1035,14 @@ class SidxBox(Mp4FullBox):
                 rt_sz = read_u32(fp)
                 subsegment_dur = read_u32(fp)
                 st_sz = read_u32(fp)
-                self.box_info['reference_list'].append({'reference_type': rt_sz // 2147483648, 'reference_size': rt_sz % 2147483648,
-                                       'subsegment_duration': subsegment_dur, 'starts_with_sap': st_sz // 2147483648,
-                                       'SAP_type': (st_sz % 2147483648) // 268435456, 'SAP_delta_time': st_sz // 268435456})
+                self.box_info['reference_list'].append({
+                                                        'reference_type': rt_sz // 2147483648,
+                                                        'reference_size': rt_sz % 2147483648,
+                                                        'subsegment_duration': subsegment_dur,
+                                                        'starts_with_sap': st_sz // 2147483648,
+                                                        'SAP_type': (st_sz % 2147483648) // 268435456,
+                                                        'SAP_delta_time': st_sz // 268435456
+                                                      })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1076,8 +1050,7 @@ class SidxBox(Mp4FullBox):
 class SsixBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
@@ -1086,7 +1059,7 @@ class SsixBox(Mp4FullBox):
             for i in range(self.box_info['subsegment_count']):
                 subsegment_dict = {'range_count': read_u32(fp)}
                 range_list = []
-                for i in range(self.box_info['range_count']):
+                for j in range(self.box_info['range_count']):
                     l_r = read_u32(fp)
                     range_list.append({'level': l_r // 16777216, 'range_size': l_r % 16777216})
                 subsegment_dict['range_list'] = range_list
@@ -1098,8 +1071,7 @@ class SsixBox(Mp4FullBox):
 class PrftBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
-        super().__init__(header, parent)
-        self.start_of_box = fp.tell()
+        super().__init__(fp, header, parent)
         try:
             fp.seek(self.header.header_size, 1)
             self.box_info = self.set_version_and_flags(fp)
