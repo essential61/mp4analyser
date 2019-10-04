@@ -309,7 +309,7 @@ class MdatBox(Mp4Box):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            self.box_info['message'] = 'If mdat > 10 MB only the first 10 MB will be shown in the hex view'
+            self.box_info['message'] = 'If mdat > 1 MB only the first 1 MB will be shown in the hex view'
         finally:
             fp.seek(self.start_of_box + self.size)
 

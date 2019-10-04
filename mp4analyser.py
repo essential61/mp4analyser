@@ -167,7 +167,7 @@ class MyApp(Tk):
 
     def populate_text_widget(self, box_selected):
         self.t.delete(1.0, END)
-        my_string = "Box is located at position " + "{0:#x}".format(box_selected.start_of_box) + \
+        my_string = "Box is located at position " + "{0:#d}".format(box_selected.start_of_box) + \
                     " from start of from file\n\n"
         my_string += "Has header:\n" + json.dumps(box_selected.header.get_header()) + "\n\n"
         if len(box_selected.box_info) > 0:
@@ -178,17 +178,25 @@ class MyApp(Tk):
         self.t.insert(END, my_string)
 
     def populate_hex_text_widget(self, box_selected):
-        line_length = 64
+        line_length = 64 # Num bytes per line
         self.thex.delete(1.0, END)
-        hex_bytes = binascii.hexlify(box_selected.get_hex_view())
+        my_byte_string = box_selected.get_hex_view()
+        trunc = False
+        if len(my_byte_string) > 1000000:
+            my_byte_string = my_byte_string[:100000]
+            trunc = True
+        hex_bytes = binascii.hexlify(my_byte_string)
         hex_string = ''
         for i in range(0, len(hex_bytes), line_length):
             hex_line = hex_bytes[i:i + line_length].decode('utf-8')
             pretty_hex_line = ''
             for j in range(0, len(hex_line), 2):
-                pretty_hex_line += hex_line[j:j+2] + '-'
+                pretty_hex_line += hex_line[j:j+2] + ' '
             hex_string += pretty_hex_line + '\n'
-        self.thex.insert(END, hex_string)
+        if trunc:
+            self.thex.insert(END, 'Hex view, showing first 1MB: \n\n' + hex_string)
+        else:
+            self.thex.insert(END, 'Hex view: \n' + hex_string)
 
 
 if __name__ == '__main__':

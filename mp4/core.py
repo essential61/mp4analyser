@@ -11,8 +11,8 @@ class Mp4Box:
         self.box_info = {}
         self.byte_string = None
         if parent.type == 'file':
-            if self.type == 'mdat' and self.size > 10000000:
-                self.byte_string = fp.read(10000000)
+            if self.type == 'mdat' and self.size > 1000001:
+                self.byte_string = fp.read(1000001)
             else:
                 self.byte_string = fp.read(self.size)
             fp.seek(self.start_of_box)
