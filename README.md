@@ -10,9 +10,9 @@ Use the latest version of Python (3.7+)
 In development, but should be usable.
 
 ## TODO: ##
-* 1. Add more iso boxes, aim for complete coverage of ISO/IEC 14496-12 – MPEG-4 Part 12.
-* 2. Add more non-iso boxes.
-* 3. Optimise and refine code.
+* Add more iso boxes, aim for complete coverage of ISO/IEC 14496-12 – MPEG-4 Part 12.
+* Add more non-iso boxes.
+* Optimise and refine code.
 
 # Authors #
 Steven Hentschel
