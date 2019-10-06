@@ -1,3 +1,11 @@
+"""
+non_iso.py
+
+This file contains class definitions for boxes not defined in ISO/IEC 14496-12.
+It may be useful to look here:
+https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html#//apple_ref/doc/uid/TP40000939-CH204-55265
+
+"""
 import mp4.iso
 from mp4.util import *
 from mp4.core import *
@@ -18,11 +26,6 @@ def box_factory_non_iso(fp, header, parent):
     return the_box
 
 
-'''
-Boxes not Defined in ISO BMFF
-'''
-
-
 class UndefinedBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
@@ -38,7 +41,7 @@ class Avc1Box(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(self.header.header_size + 24, 1)
+            fp.seek(20, 1)
             self.box_info['width'] = read_u16(fp)
             self.box_info['height'] = read_u16(fp)
             self.box_info['horizresolution'] = "{0:#010x}".format(read_u32(fp))
@@ -68,7 +71,6 @@ class AvcCBox(Mp4Box):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(self.header.header_size, 1)
             self.box_info['configuration_version'] = read_u8(fp)
             self.box_info['avc_profile_indication'] = read_u8(fp)
             self.box_info['avc_compatibility'] = read_u8(fp)
@@ -82,7 +84,7 @@ class Mp4aBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(self.header.header_size + 6, 1)
+            fp.seek(2, 1)
             self.box_info['reference_index'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_encoding_version'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_encoding_revision'] = "{0:#06x}".format(read_u16(fp))
@@ -108,8 +110,7 @@ class EsdsBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(self.header.header_size, 1)
-            self.box_info = self.set_version_and_flags(fp)
-        # TODO
+            pass
+            # TODO
         finally:
             fp.seek(self.start_of_box + self.size)

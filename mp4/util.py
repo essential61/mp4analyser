@@ -1,5 +1,10 @@
+"""
+util.py
+
+Utility functions to save me typing struct.unpack all the time.
+
+"""
 import struct
-# Utility functions
 
 
 def read_u8(fp):
@@ -45,7 +50,6 @@ def read_u16_16(fp):
 
 
 def read_i8_8(fp):
-    # unclear whether fractional part is signed or unsigned?
     ipart = struct.unpack('>b', fp.read(1))[0]
     fpart = struct.unpack('B', fp.read(1))[0]
     return ipart + (fpart / 256)

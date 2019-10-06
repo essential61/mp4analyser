@@ -1,10 +1,20 @@
+"""
+mp4analyser.py
+
+A tkinter application that allows inspection of MP4 files that conform to ISO/IEC 14496-12
+
+This file generates the user interface, and contains the callback functions that respond to user events.
+
+
+"""
+
 import os
 import json
 import binascii
 from tkinter import *
 from tkinter import filedialog
 from tkinter import ttk
-
+# mp4 is the package that actually parses the mp4 file
 import mp4.iso
 
 try:
@@ -48,7 +58,7 @@ class MyApp(Tk):
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
-        self.geometry('1050x600')
+        self.geometry('1300x700')
         self.option_add('*tearOff', FALSE)
         self.menubar = Menu(self)
 
@@ -101,16 +111,22 @@ class MyApp(Tk):
         self.scroll3.grid(column=1, row=1, sticky=(N, S))
         self.thex['yscrollcommand'] = self.scroll3.set
 
+        # Sub-classed auto hiding scroll bar
+        self.scroll4 = AutoScrollbar(self.f2, orient=HORIZONTAL, command=self.thex.xview)
+        self.scroll4.grid(column=0, row=2, sticky=(W, E))
+        self.thex['xscrollcommand'] = self.scroll4.set
+
     def open_file(self):
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", "*.mp4"), ("All Files", "*.*")),
                                               initialdir=self.dialog_dir)
         self.mp4file = mp4.iso.Mp4File(filename)
         self.dialog_dir, filenamebase = os.path.split(filename)
         self.title("MP4 Analyser" + " - " + filenamebase)
-        # Clear tree and text widget if not empty
+        # Clear tree and text widgets if not empty
         self.tree.delete(*self.tree.get_children())
         self.t.delete(1.0, END)
-        # Now fill it with new contents
+        self.thex.delete(1.0, END)
+        # Now fill tree with new contents
         for l0, this_box in enumerate(self.mp4file.child_boxes):
             self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
             for l1, this_box in enumerate(this_box.child_boxes):
@@ -178,23 +194,26 @@ class MyApp(Tk):
         self.t.insert(END, my_string)
 
     def populate_hex_text_widget(self, box_selected):
-        line_length = 64 # Num bytes per line
+        bytes_per_line = 32  # Num bytes per line
+        trunc_size = 1000000  # Maximum number of bytes to display in hex view to prevent tk text widget barfing.
         self.thex.delete(1.0, END)
         my_byte_string = box_selected.get_hex_view()
         trunc = False
-        if len(my_byte_string) > 1000000:
-            my_byte_string = my_byte_string[:100000]
+        if len(my_byte_string) > trunc_size:
+            my_byte_string = my_byte_string[:trunc_size]
             trunc = True
-        hex_bytes = binascii.hexlify(my_byte_string)
         hex_string = ''
-        for i in range(0, len(hex_bytes), line_length):
-            hex_line = hex_bytes[i:i + line_length].decode('utf-8')
+        for i in range(0, len(my_byte_string), bytes_per_line):
+            byte_line = my_byte_string[i:i + bytes_per_line]
+            char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.' for k in byte_line.decode('utf-8', "replace")])
+            hex_line = binascii.hexlify(byte_line).decode('utf-8')
             pretty_hex_line = ''
             for j in range(0, len(hex_line), 2):
                 pretty_hex_line += hex_line[j:j+2] + ' '
-            hex_string += pretty_hex_line + '\n'
+            pretty_hex_line = pretty_hex_line.ljust(3 * bytes_per_line)
+            hex_string += pretty_hex_line + '\t' + char_line + '\n'
         if trunc:
-            self.thex.insert(END, 'Hex view, showing first 1MB: \n\n' + hex_string)
+            self.thex.insert(END, 'Hex view, showing first 1MB: \n' + hex_string)
         else:
             self.thex.insert(END, 'Hex view: \n' + hex_string)
 

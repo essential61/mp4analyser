@@ -1,3 +1,7 @@
+"""
+core.py contains class definitions used by both iso.py and non_iso.py, namely parent classes (Mp4Box and Mp4FullBox)
+for all real, instantiated boxes. Also contains a header class definition.
+"""
 from mp4.util import *
 
 
@@ -16,6 +20,7 @@ class Mp4Box:
             else:
                 self.byte_string = fp.read(self.size)
             fp.seek(self.start_of_box)
+        fp.seek(self.start_of_box + self.header.header_size)
 
     @property
     def size(self):
@@ -44,10 +49,8 @@ class Mp4FullBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
-
-    def set_version_and_flags(self, fp):
         four_bytes = read_u32(fp)
-        return {'version': four_bytes // 16777216, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
+        self.box_info = {'version': four_bytes // 16777216, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
 
 
 class Header:
@@ -63,7 +66,7 @@ class Header:
         self.header_size = fp.tell() - start_of_box
         # throw error if size < 8 as 8 bytes is smallest box (free, skip etc)
         if self.size < 8:
-            raise Exception('box size should be 8 or more. The value of size was: {}'.format(self.size))
+            raise Exception('box size should be at least 8 bytes. The value of size was: {}'.format(self.size))
         fp.seek(start_of_box)
 
     @property
