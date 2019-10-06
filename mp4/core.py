@@ -1,16 +1,26 @@
-import json
+"""
+core.py contains class definitions used by both iso.py and non_iso.py, namely parent classes (Mp4Box and Mp4FullBox)
+for all real, instantiated boxes. Also contains a header class definition.
+"""
 from mp4.util import *
+
 
 class Mp4Box:
 
-    def __init__(self, header):
+    def __init__(self, fp, header, parent):
         self.header = header
-        self.start_of_box = 0
+        self.parent = parent
+        self.start_of_box = fp.tell()
         self.child_boxes = []
         self.box_info = {}
-
-    def get_box_data(self):
-        return json.dumps(self.box_info, indent=4) if len(self.box_info) > 0 else ""
+        self.byte_string = None
+        if parent.type == 'file':
+            if self.type == 'mdat' and self.size > 1000001:
+                self.byte_string = fp.read(1000001)
+            else:
+                self.byte_string = fp.read(self.size)
+            fp.seek(self.start_of_box)
+        fp.seek(self.start_of_box + self.header.header_size)
 
     @property
     def size(self):
@@ -20,18 +30,27 @@ class Mp4Box:
     def type(self):
         return self.header.type
 
-    def get_children(self):
-        return json.dumps([box.type for box in self.child_boxes]) if len(self.child_boxes) > 0 else ""
+    def get_children_types(self):
+        return [box.type for box in self.child_boxes]
+
+    def get_top(self):
+        if self.parent.type == 'file':
+            return self
+        else:
+            return self.parent.get_top()
+
+    def get_hex_view(self):
+        top_box = self.get_top()
+        offset = self.start_of_box - top_box.start_of_box
+        return top_box.byte_string[offset:offset + self.size]
 
 
 class Mp4FullBox(Mp4Box):
 
-    def __init__(self, header):
-        super().__init__(header)
-
-    def set_version_and_flags(self, fp):
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
         four_bytes = read_u32(fp)
-        return {'version': four_bytes // 16777216, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
+        self.box_info = {'version': four_bytes // 16777216, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
 
 
 class Header:
@@ -47,7 +66,7 @@ class Header:
         self.header_size = fp.tell() - start_of_box
         # throw error if size < 8 as 8 bytes is smallest box (free, skip etc)
         if self.size < 8:
-            raise Exception('box size should be 8 or more. The value of size was: {}'.format(self.size))
+            raise Exception('box size should be at least 8 bytes. The value of size was: {}'.format(self.size))
         fp.seek(start_of_box)
 
     @property
@@ -63,5 +82,4 @@ class Header:
             ret_header['largesize'] = self._largesize
         if self.type == 'uuid':
             ret_header['uuid'] = self.uuid
-        return json.dumps(ret_header, indent=4)
-
+        return ret_header
