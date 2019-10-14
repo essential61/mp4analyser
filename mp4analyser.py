@@ -127,7 +127,7 @@ class MyApp(Tk):
         self.thex['xscrollcommand'] = self.scroll4.set
 
     def open_file(self):
-        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4, .m4a, .m4p, .m4b, .m4r .m4v"),
+        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4a .m4p .m4b .m4r .m4v"),
                                                          ("All Files", "*.*")), initialdir=self.dialog_dir)
         self.status.configure(text="Loading...")
         self.mp4file = mp4.iso.Mp4File(filename)
