@@ -54,7 +54,7 @@ class MyApp(Tk):
     def __init__(self):
         super().__init__()
         # uncomment desired logging level
-        #logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.DEBUG)
+        logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.DEBUG)
         #logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
 
         self.mp4file = None
@@ -232,12 +232,11 @@ class MyApp(Tk):
             byte_line = my_byte_string[i:i + bytes_per_line]
             char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.'  # which is better 256 or 65536?
                                  for k in byte_line.decode('utf-8', "replace")])
-            hex_line = binascii.hexlify(byte_line).decode('utf-8')
-            pretty_hex_line = ''
-            for j in range(0, len(hex_line), 2):
-                pretty_hex_line += hex_line[j:j + 2] + ' '
+            hex_line = binascii.b2a_hex(byte_line).decode('utf-8')
+            pretty_hex_line = " ".join([hex_line[j:j + 2] for j in range(0, len(hex_line), 2)])
             pretty_hex_line = pretty_hex_line.ljust(3 * bytes_per_line)
             hex_string += pretty_hex_line + '\t' + char_line + '\n'
+        logging.debug("Hex text processed")
         if trunc:
             self.thex.insert(END, 'Hex view, showing first 1MB: \n' + hex_string)
         else:
