@@ -78,7 +78,9 @@ class MyApp(Tk):
         self.config(menu=self.menubar)
 
         # status bar
-        self.status = Label(self, text="", bd=1, relief=SUNKEN, anchor=W)
+        self.statustext = StringVar()
+        self.statustext.set("")
+        self.status = Label(self, textvariable=self.statustext, bd=1, relief=SUNKEN, anchor=W)
         self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
 
         # create paned window
@@ -135,7 +137,8 @@ class MyApp(Tk):
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4a .m4p .m4b .m4r .m4v"),
                                                          ("All Files", "*.*")), initialdir=self.dialog_dir)
         logging.debug("Loading file " + filename)
-        self.status.configure(text="Loading...")
+        self.statustext.set("Loading...")
+        self.update_idletasks()
         self.mp4file = mp4.iso.Mp4File(filename)
         self.dialog_dir, filename_base = os.path.split(filename)
         self.title("MP4 Analyser" + " - " + filename_base)
@@ -171,11 +174,12 @@ class MyApp(Tk):
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
         logging.debug("Finished loading file " + filename)
-        self.status.configure(text="")
+        self.statustext.set("")
 
     def select_box(self, a):
         logging.debug("Box selected " + self.tree.focus())
-        self.status.configure(text="Loading...")
+        self.statustext.set("Loading...")
+        self.update_idletasks()
         # self.tree.focus() returns id in the form  n.n.n as text
         l = [int(i) for i in self.tree.focus().split('.')]
         box_selected = None
@@ -204,7 +208,7 @@ class MyApp(Tk):
         logging.debug("Upper text widget populated")
         self.populate_hex_text_widget(box_selected)
         logging.debug("Hex text widget populated")
-        self.status.configure(text="")
+        self.statustext.set("")
 
     def populate_text_widget(self, box_selected):
         self.t.delete(1.0, END)
