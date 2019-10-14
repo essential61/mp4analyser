@@ -54,11 +54,14 @@ class MyApp(Tk):
         super().__init__()
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")
+
         # build ui
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.geometry('1300x700')
+
+        # build a menu bar
         self.option_add('*tearOff', FALSE)
         self.menubar = Menu(self)
 
@@ -69,6 +72,11 @@ class MyApp(Tk):
         self.menubar.add_cascade(label="File", menu=self.filemenu)
         self.config(menu=self.menubar)
 
+        # status bar
+        self.status = Label(self, text="", bd=1, relief=SUNKEN, anchor=W)
+        self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
+
+        # create paned window
         self.p = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.p.grid(column=0, row=0, sticky=(N, W, E, S))
 
@@ -78,7 +86,7 @@ class MyApp(Tk):
         self.f1.columnconfigure(0, weight=1)
         self.f1.rowconfigure(0, weight=1)
 
-        self.f2 = ttk.Labelframe(self.p, text='Box Details', width=750,)  # second pane
+        self.f2 = ttk.Labelframe(self.p, text='Box Details', width=750, )  # second pane
         self.f2.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f2.columnconfigure(0, weight=1)
         self.f2.rowconfigure(0, weight=1)
@@ -95,6 +103,7 @@ class MyApp(Tk):
         self.tree['yscrollcommand'] = self.scroll1.set
         self.tree.bind('<ButtonRelease-1>', self.select_box)
 
+        # text widget display details of selected box
         self.t = ReadOnlyText(self.f2, state='normal', width=120, height=24, wrap='none')
         self.t.grid(column=0, row=0, sticky=(N, W, E, S))
 
@@ -103,6 +112,7 @@ class MyApp(Tk):
         self.scroll2.grid(column=1, row=0, sticky=(N, S))
         self.t['yscrollcommand'] = self.scroll2.set
 
+        # text widget displaying hex
         self.thex = ReadOnlyText(self.f2, state='normal', width=120, height=15, wrap='none')
         self.thex.grid(column=0, row=1, sticky=(N, W, E, S))
 
@@ -117,11 +127,12 @@ class MyApp(Tk):
         self.thex['xscrollcommand'] = self.scroll4.set
 
     def open_file(self):
-        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", "*.mp4"), ("All Files", "*.*")),
-                                              initialdir=self.dialog_dir)
+        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4, .m4a, .m4p, .m4b, .m4r .m4v"),
+                                                         ("All Files", "*.*")), initialdir=self.dialog_dir)
+        self.status.configure(text="Loading...")
         self.mp4file = mp4.iso.Mp4File(filename)
-        self.dialog_dir, filenamebase = os.path.split(filename)
-        self.title("MP4 Analyser" + " - " + filenamebase)
+        self.dialog_dir, filename_base = os.path.split(filename)
+        self.title("MP4 Analyser" + " - " + filename_base)
         # Clear tree and text widgets if not empty
         self.tree.delete(*self.tree.get_children())
         self.t.delete(1.0, END)
@@ -153,8 +164,10 @@ class MyApp(Tk):
                                                                                           l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
+        self.status.configure(text="")
 
     def select_box(self, a):
+        self.status.configure(text="Loading...")
         # self.tree.focus() returns id in the form  n.n.n as text
         l = [int(i) for i in self.tree.focus().split('.')]
         box_selected = None
@@ -180,6 +193,7 @@ class MyApp(Tk):
                 l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
         self.populate_text_widget(box_selected)
         self.populate_hex_text_widget(box_selected)
+        self.status.configure(text="")
 
     def populate_text_widget(self, box_selected):
         self.t.delete(1.0, END)
@@ -195,7 +209,7 @@ class MyApp(Tk):
 
     def populate_hex_text_widget(self, box_selected):
         bytes_per_line = 32  # Num bytes per line
-        trunc_size = 1000000  # Maximum number of bytes to display in hex view to prevent tk text widget barfing.
+        trunc_size = 1000000  # Arbitrary max number of bytes to display in hex view to prevent tk text widget barfing.
         self.thex.delete(1.0, END)
         my_byte_string = box_selected.get_hex_view()
         trunc = False
@@ -205,11 +219,12 @@ class MyApp(Tk):
         hex_string = ''
         for i in range(0, len(my_byte_string), bytes_per_line):
             byte_line = my_byte_string[i:i + bytes_per_line]
-            char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.' for k in byte_line.decode('utf-8', "replace")])
+            char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.'  # which is better 256 or 65536?
+                                 for k in byte_line.decode('utf-8', "replace")])
             hex_line = binascii.hexlify(byte_line).decode('utf-8')
             pretty_hex_line = ''
             for j in range(0, len(hex_line), 2):
-                pretty_hex_line += hex_line[j:j+2] + ' '
+                pretty_hex_line += hex_line[j:j + 2] + ' '
             pretty_hex_line = pretty_hex_line.ljust(3 * bytes_per_line)
             hex_string += pretty_hex_line + '\t' + char_line + '\n'
         if trunc:
