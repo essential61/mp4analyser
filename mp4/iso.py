@@ -6,6 +6,7 @@ Additionally a class to represent the MP4 file containing the MP4 boxes has been
 A box_factory function has also been defined, primarily to minimise coupling between modules.
 
 """
+import binascii
 import datetime
 import mp4.non_iso
 from mp4.core import *
@@ -100,8 +101,8 @@ def box_factory(fp, header, parent):
         the_box = SdtpBox(fp, header, parent)
     elif header.type == 'sbgp':
         the_box = SbgpBox(fp, header, parent)
-#    elif header.type == 'sgpd':
-#        the_box = SgpdBox(fp, header, parent)
+    elif header.type == 'sgpd':
+        the_box = SgpdBox(fp, header, parent)
     elif header.type == 'subs':
         the_box = SubsBox(fp, header, parent)
 #    elif header.type == 'saiz':
@@ -841,7 +842,7 @@ class SbgpBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            self.box_info['grouping_type'] = read_u32(fp)
+            self.box_info['grouping_type'] = fp.read(4).decode('utf-8')
             if self.box_info['version'] == 1:
                 self.box_info['grouping_type_parameter'] = read_u32(fp)
             self.box_info['entry_count'] = read_u32(fp)
@@ -851,6 +852,29 @@ class SbgpBox(Mp4FullBox):
                                                     'sample_count': read_u32(fp),
                                                     'group_description_index': read_u32(fp)
                                                   })
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class SgpdBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['grouping_type'] = fp.read(4).decode('utf-8')
+            if self.box_info['version'] == 1:
+                self.box_info['default_length'] = read_u32(fp)
+            elif self.box_info['version'] >= 2:
+                self.box_info['default_sample_description_index'] = read_u32(fp)
+            self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['entry_count']):
+                if self.box_info['default_length'] == 0 and self.box_info['version'] == 1:
+                    description_length = read_u32(fp)
+                else:
+                    description_length = self.box_info['default_length']
+                sample_group_entry = binascii.b2a_hex(fp.read(description_length)).decode('utf-8')
+                self.box_info['entry_list'].append({'sample_group_entry': sample_group_entry})
         finally:
             fp.seek(self.start_of_box + self.size)
 
