@@ -17,7 +17,6 @@ from tkinter import filedialog
 from tkinter import ttk
 # mp4 is the package that actually parses the mp4 file
 import mp4.iso
-import pprofile
 
 try:
     from idlelib.redirector import WidgetRedirector
@@ -84,7 +83,7 @@ class MyApp(Tk):
         self.status = Label(self, textvariable=self.statustext, bd=1, relief=SUNKEN, anchor=W)
         self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
 
-        # create paned window
+        # create left-right paned window
         self.p = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.p.grid(column=0, row=0, sticky=(N, W, E, S))
 
@@ -227,25 +226,22 @@ class MyApp(Tk):
         bytes_per_line = 32  # Num bytes per line
         trunc_size = 1000000  # Arbitrary max number of bytes to display in hex view to prevent tk text widget barfing.
         self.thex.delete(1.0, END)
-        prof = pprofile.Profile()
-        with prof():
-        # Code to profile
-            my_byte_string = box_selected.get_hex_view()
-            trunc = False
-            if len(my_byte_string) > trunc_size:
-                my_byte_string = my_byte_string[:trunc_size]
-                trunc = True
-            hex_string = ''
-            for i in range(0, len(my_byte_string), bytes_per_line):
-                byte_line = my_byte_string[i:i + bytes_per_line]
-                char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.'  # which is better 256 or 65536?
-                                     for k in byte_line.decode('utf-8', "replace")])
-                hex_line = binascii.b2a_hex(byte_line).decode('utf-8')
-                pretty_hex_line = " ".join([hex_line[j:j + 2] for j in range(0, len(hex_line), 2)])
-                pretty_hex_line = pretty_hex_line.ljust(3 * bytes_per_line)
-                hex_string += pretty_hex_line + '\t' + char_line + '\n'
+        my_byte_string = box_selected.get_hex_view()
+        trunc = False
+        if len(my_byte_string) > trunc_size:
+            my_byte_string = my_byte_string[:trunc_size]
+            trunc = True
+        hex_string = ''
+        for i in range(0, len(my_byte_string), bytes_per_line):
+            byte_line = my_byte_string[i:i + bytes_per_line]
+            # which is better 256 or 65536? Maybe 65536 for east asian subs
+            char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.'
+                                 for k in byte_line.decode('utf-8', "replace")])
+            hex_line = binascii.b2a_hex(byte_line).decode('utf-8')
+            pretty_hex_line = " ".join([hex_line[j:j + 2] for j in range(0, len(hex_line), 2)])
+            pretty_hex_line = pretty_hex_line.ljust(3 * bytes_per_line)
+            hex_string += pretty_hex_line + '\t' + char_line + '\n'
         logging.debug("Hex text processed")
-        prof.print_stats()
         if trunc:
             self.thex.insert(END, 'Hex view, showing first 1MB: \n' + hex_string)
         else:
