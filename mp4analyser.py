@@ -87,18 +87,30 @@ class MyApp(Tk):
         self.p = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.p.grid(column=0, row=0, sticky=(N, W, E, S))
 
+        # create left-right paned window
+        self.p1 = ttk.Panedwindow(self.p, orient=VERTICAL)
+        self.p1.grid(column=0, row=0, sticky=(N, W, E, S))
+
         # first pane, which would get widgets gridded into it:
         self.f1 = ttk.Labelframe(self.p, text='Box Hierarchy')
         self.f1.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f1.columnconfigure(0, weight=1)
         self.f1.rowconfigure(0, weight=1)
 
-        self.f2 = ttk.Labelframe(self.p, text='Box Details', width=750, )  # second pane
+        self.f2 = ttk.Labelframe(self.p1, text='Box Details', width=750, )  # second pane
         self.f2.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f2.columnconfigure(0, weight=1)
         self.f2.rowconfigure(0, weight=1)
+
+        self.f3 = ttk.Labelframe(self.p1, text='Hex View', width=750, )  # second pane
+        self.f3.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.f3.columnconfigure(0, weight=1)
+        self.f3.rowconfigure(0, weight=1)
+
         self.p.add(self.f1)
-        self.p.add(self.f2)
+        self.p.add(self.p1)
+        self.p1.add(self.f2)
+        self.p1.add(self.f3)
 
         self.tree = ttk.Treeview(self.f1, show="tree")
         self.tree.grid(column=0, row=0, sticky=(N, W, E, S))
@@ -120,17 +132,17 @@ class MyApp(Tk):
         self.t['yscrollcommand'] = self.scroll2.set
 
         # text widget displaying hex
-        self.thex = ReadOnlyText(self.f2, state='normal', width=120, height=15, wrap='none')
-        self.thex.grid(column=0, row=1, sticky=(N, W, E, S))
+        self.thex = ReadOnlyText(self.f3, state='normal', width=120, height=15, wrap='none')
+        self.thex.grid(column=0, row=0, sticky=(N, W, E, S))
 
         # Sub-classed auto hiding scroll bar
-        self.scroll3 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.thex.yview)
-        self.scroll3.grid(column=1, row=1, sticky=(N, S))
+        self.scroll3 = AutoScrollbar(self.f3, orient=VERTICAL, command=self.thex.yview)
+        self.scroll3.grid(column=1, row=0, sticky=(N, S))
         self.thex['yscrollcommand'] = self.scroll3.set
 
         # Sub-classed auto hiding scroll bar
-        self.scroll4 = AutoScrollbar(self.f2, orient=HORIZONTAL, command=self.thex.xview)
-        self.scroll4.grid(column=0, row=2, sticky=(W, E))
+        self.scroll4 = AutoScrollbar(self.f3, orient=HORIZONTAL, command=self.thex.xview)
+        self.scroll4.grid(column=0, row=1, sticky=(W, E))
         self.thex['xscrollcommand'] = self.scroll4.set
 
     def open_file(self):
