@@ -80,7 +80,7 @@ class MyApp(Tk):
         # status bar
         self.statustext = StringVar()
         self.statustext.set("")
-        self.status = Label(self, textvariable=self.statustext, bd=1, relief=SUNKEN, anchor=W)
+        self.status = Label(self, textvariable=self.statustext, bd=1, anchor=W)
         self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
 
         # create left-right paned window

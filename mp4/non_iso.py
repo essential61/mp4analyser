@@ -31,6 +31,10 @@ def box_factory_non_iso(fp, header, parent):
         the_box = Mp4aBox(fp, header, parent)
     elif header.type == 'esds':
         the_box = EsdsBox(fp, header, parent)
+    elif header.type == 'ilst':
+        the_box = IlstBox(fp, header, parent)
+    elif header.type == 'data':
+        the_box = DataBox(fp, header, parent)
     else:
         the_box = UndefinedBox(fp, header, parent)
     return the_box
@@ -225,5 +229,37 @@ class EsdsBox(Mp4FullBox):
         try:
             self.box_info['elementary_stream_descriptor'] = \
                 binascii.b2a_hex(fp.read(self.size -(self.header.header_size + 4))).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class IlstBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['offset'] = read_u32(fp)
+            my_4bytes = fp.read(4)
+            if (struct.unpack('>I', my_4bytes)[0]) // 16777216 == 169:
+                self.box_info['box_type'] = my_4bytes[1:].decode('utf-8')
+            else:
+                self.box_info['box_type'] = my_4bytes.decode('utf-8')
+            bytes_left = self.start_of_box + self.size - fp.tell()
+            while bytes_left > 7:
+                current_header = Header(fp)
+                current_box = mp4.iso.box_factory(fp, current_header, self)
+                self.child_boxes.append(current_box)
+                bytes_left -= current_box.size
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class DataBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            fp.seek(4, 1)
+            self.box_info['text'] = fp.read(self.size - (self.header.header_size + 8)).decode('utf-8')
         finally:
             fp.seek(self.start_of_box + self.size)
