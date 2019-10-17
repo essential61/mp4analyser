@@ -55,7 +55,7 @@ class MyApp(Tk):
         super().__init__()
         # uncomment desired logging level
         logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.DEBUG)
-        #logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
+        # logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
 
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")
@@ -91,27 +91,31 @@ class MyApp(Tk):
         self.p1 = ttk.Panedwindow(self.p, orient=VERTICAL)
         self.p1.grid(column=0, row=0, sticky=(N, W, E, S))
 
-        # first pane, which would get widgets gridded into it:
+        # first pane shown on left:
         self.f1 = ttk.Labelframe(self.p, text='Box Hierarchy')
         self.f1.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f1.columnconfigure(0, weight=1)
         self.f1.rowconfigure(0, weight=1)
 
+        # box details shown top right
         self.f2 = ttk.Labelframe(self.p1, text='Box Details', width=750, )  # second pane
         self.f2.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f2.columnconfigure(0, weight=1)
         self.f2.rowconfigure(0, weight=1)
 
+        # hex view shown bottom right
         self.f3 = ttk.Labelframe(self.p1, text='Hex View', width=750, )  # second pane
         self.f3.grid(column=0, row=0, sticky=(N, W, E, S))
         self.f3.columnconfigure(0, weight=1)
         self.f3.rowconfigure(0, weight=1)
 
+        # add seems to work left to right, top to bottom
         self.p.add(self.f1)
         self.p.add(self.p1)
         self.p1.add(self.f2)
         self.p1.add(self.f3)
 
+        # tree view showing box hierarchy
         self.tree = ttk.Treeview(self.f1, show="tree")
         self.tree.grid(column=0, row=0, sticky=(N, W, E, S))
         self.tree.column("#0", width=300)
@@ -146,6 +150,7 @@ class MyApp(Tk):
         self.thex['xscrollcommand'] = self.scroll4.set
 
     def open_file(self):
+        """ Callback on selecting 'Open' from menu """
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4a .m4p .m4b .m4r .m4v"),
                                                          ("All Files", "*.*")), initialdir=self.dialog_dir)
         logging.debug("Loading file " + filename)
@@ -189,6 +194,7 @@ class MyApp(Tk):
         self.statustext.set("")
 
     def select_box(self, a):
+        """ Callback on selecting an Mp4 box in treeview """
         logging.debug("Box selected " + self.tree.focus())
         self.statustext.set("Loading...")
         self.update_idletasks()
@@ -231,14 +237,14 @@ class MyApp(Tk):
             # insertion order is preserved in modern Python
             my_string += "Has values:\n" + json.dumps(box_selected.box_info, indent=4) + "\n\n"
         if len(box_selected.child_boxes) > 0:
-            my_string += "Has child boxes:\n" + json.dumps(box_selected.get_children_types())
+            my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.child_boxes])
         self.t.insert(END, my_string)
 
     def populate_hex_text_widget(self, box_selected):
         bytes_per_line = 32  # Num bytes per line
         trunc_size = 1000000  # Arbitrary max number of bytes to display in hex view to prevent tk text widget barfing.
         self.thex.delete(1.0, END)
-        my_byte_string = box_selected.get_hex_view()
+        my_byte_string = box_selected.get_bytes()
         trunc = False
         if len(my_byte_string) > trunc_size:
             my_byte_string = my_byte_string[:trunc_size]

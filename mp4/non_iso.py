@@ -1,7 +1,7 @@
 """
 non_iso.py
 
-This file contains class definitions for boxes not defined in ISO/IEC 14496-12.
+This file is meant to contain class definitions for boxes not defined in ISO/IEC 14496-12.
 It may be useful to look here:
 https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFChap2/qtff2.html#//apple_ref/doc/uid/TP40000939-CH204-55265
 

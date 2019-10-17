@@ -1,8 +1,8 @@
 """
 iso.py
 
-This file (when complete) contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
-Additionally a class to represent the MP4 file containing the MP4 boxes has been defined.
+This file (if and when complete ;-) ) contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
+Additionally a class to represent the MP4 file that contains the MP4 boxes has been defined.
 A box_factory function has also been defined, primarily to minimise coupling between modules.
 
 """
