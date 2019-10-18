@@ -2,7 +2,9 @@
 This project is a Python/TkInter application that can read and display the structure and contents of "boxes" 
 (AKA "atoms" in Quick Time documentation) within mp4 files that conform to ISO/IEC 14496-12 – MPEG-4 Part 12.
 
-It should work cross-platform (Windows, Linux, MacOS)
+I believe the use of Python allows any technically-minded individual to add their own "box" definitions as required.
+
+It should work on any platform that can run a Python interpreter and support TKinter.
 
 # Prerequisites #
 Use the latest version of Python (3.7+)
