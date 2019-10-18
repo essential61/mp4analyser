@@ -8,11 +8,10 @@ It should work cross-platform (Windows, Linux, MacOS)
 Use the latest version of Python (3.7+)
 
 # Status #
-In development, but should be usable.
+In beta trial by you, "the great internet public".
 
 ## TODO: ##
-* Add more iso boxes, aim for complete coverage of ISO/IEC 14496-12 – MPEG-4 Part 12.
-* Add more non-iso boxes.
+* keep adding boxes.
 * Optimise and refine code.
 
 # Authors #
