@@ -3,7 +3,7 @@ This project is a Python/TkInter application that can read and display the struc
 (AKA "atoms" in Quick Time documentation) within mp4 files that conform to ISO/IEC 14496-12 – MPEG-4 Part 12.
 
 I believe the use of Python allows any technically-minded individual to add their own "box" definitions as required. 
-See [wiki](https://github.com/essential61/mp4analyser/wiki)
+[See wiki](https://github.com/essential61/mp4analyser/wiki)
 
 It should work on any platform that can run a Python interpreter and support TKinter.
 
