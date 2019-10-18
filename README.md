@@ -13,7 +13,7 @@ Use the latest version of Python (3.7+)
 In beta trial by you, "the great internet public".
 
 ## TODO: ##
-* keep adding boxes.
+* Keep adding boxes.
 * Optimise and refine code.
 
 # Authors #
