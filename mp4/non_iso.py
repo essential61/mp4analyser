@@ -35,6 +35,8 @@ def box_factory_non_iso(fp, header, parent):
         the_box = IlstBox(fp, header, parent)
     elif header.type == 'data':
         the_box = DataBox(fp, header, parent)
+    elif header.type == 'pssh':
+        the_box = PsshBox(fp, header, parent)
     else:
         the_box = UndefinedBox(fp, header, parent)
     return the_box
@@ -112,8 +114,8 @@ class AvcCBox(Mp4Box):
                                     'pictureParameterSetNALUnit': binascii.b2a_hex(fp.read(ppsl)).decode('utf-8')
                                 }
                 self.box_info['PictureParameterSets_list'].append(picture_param)
-            if (self.box_info['avc_profile_indication'] == 100 or self.box_info['avc_profile_indication'] == 110 or \
-                    self.box_info['avc_profile_indication'] == 122 or self.box_info['avc_profile_indication'] == 144) \
+            if (self.box_info['avc_profile_indication'] == 100 or self.box_info['avc_profile_indication'] == 110 or
+                self.box_info['avc_profile_indication'] == 122 or self.box_info['avc_profile_indication'] == 144) \
                     and (self.start_of_box + self.size - fp.tell()) > 7:
                 self.box_info['chroma_format'] = read_u8(fp) % 4
                 self.box_info['bit_depth_luma_minus8'] = read_u8(fp) % 8
@@ -240,6 +242,7 @@ class IlstBox(Mp4Box):
         try:
             self.box_info['offset'] = read_u32(fp)
             my_4bytes = fp.read(4)
+            # WTF! a non-printing character in the box type.
             if (struct.unpack('>I', my_4bytes)[0]) // 16777216 == 169:
                 self.box_info['box_type'] = my_4bytes[1:].decode('utf-8')
             else:
@@ -261,5 +264,19 @@ class DataBox(Mp4FullBox):
         try:
             fp.seek(4, 1)
             self.box_info['text'] = fp.read(self.size - (self.header.header_size + 8)).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class PsshBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['system_id'] = binascii.b2a_hex(fp.read(16)).decode('utf-8')
+            self.box_info['key_count'] = read_u32(fp)
+            self.box_info['key_list'] = []
+            for i in range(self.box_info['key_count']):
+                self.box_info['key_list'].append(binascii.b2a_hex(fp.read(16)).decode('utf-8'))
         finally:
             fp.seek(self.start_of_box + self.size)

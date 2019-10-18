@@ -76,6 +76,7 @@ class Header:
             return self._size
 
     def get_header(self):
+        """ returns all header properties as a dictionary """
         ret_header = {"size": self._size, "type": self.type}
         if self._size == 1:
             ret_header['largesize'] = self._largesize
