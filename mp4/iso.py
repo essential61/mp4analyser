@@ -1,11 +1,12 @@
 """
 iso.py
 
-This file (when complete) contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
-Additionally a class to represent the MP4 file containing the MP4 boxes has been defined.
+This file (if and when complete ;-) ) contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
+Additionally a class to represent the MP4 file that contains the MP4 boxes has been defined.
 A box_factory function has also been defined, primarily to minimise coupling between modules.
 
 """
+import binascii
 import datetime
 import mp4.non_iso
 from mp4.core import *
@@ -87,11 +88,11 @@ def box_factory(fp, header, parent):
     elif header.type == 'stco':
         the_box = StcoBox(fp, header, parent)
     elif header.type == 'co64':
-        the_box = VmhdBox(fp, header, parent)
+        the_box = Co64Box(fp, header, parent)
     elif header.type == 'stss':
         the_box = StssBox(fp, header, parent)
     elif header.type == 'stsh':
-        the_box = HmhdBox(fp, header, parent)
+        the_box = StshBox(fp, header, parent)
     elif header.type == 'padb':
         the_box = PadbBox(fp, header, parent)
     elif header.type == 'stdp':
@@ -100,24 +101,24 @@ def box_factory(fp, header, parent):
         the_box = SdtpBox(fp, header, parent)
     elif header.type == 'sbgp':
         the_box = SbgpBox(fp, header, parent)
-#    elif header.type == 'sgpd':
-#        the_box = SgpdBox(fp, header, parent)
+    elif header.type == 'sgpd':
+        the_box = SgpdBox(fp, header, parent)
     elif header.type == 'subs':
         the_box = SubsBox(fp, header, parent)
-#    elif header.type == 'saiz':
-#        the_box = SaizBox(fp, header, parent)
-#    elif header.type == 'saio':
-#        the_box = SaioBox(fp, header, parent)
+    elif header.type == 'saiz':
+        the_box = SaizBox(fp, header, parent)
+    elif header.type == 'saio':
+        the_box = SaioBox(fp, header, parent)
     elif header.type == 'udta':
         the_box = UdtaBox(fp, header, parent)
-#    elif header.type == 'mvex':
-#        the_box = MvexBox(fp, header, parent)
-#    elif header.type == 'mehd':
-#        the_box = MehdBox(fp, header, parent)
-#    elif header.type == 'trex':
-#        the_box = TrexBox(fp, header, parent)
-#    elif header.type == 'leva':
-#        the_box = LevaBox(fp, header, parent)
+    elif header.type == 'mvex':
+        the_box = MvexBox(fp, header, parent)
+    elif header.type == 'mehd':
+        the_box = MehdBox(fp, header, parent)
+    elif header.type == 'trex':
+        the_box = TrexBox(fp, header, parent)
+    elif header.type == 'leva':
+        the_box = LevaBox(fp, header, parent)
     elif header.type == 'moof':
         the_box = MoofBox(fp, header, parent)
     elif header.type == 'mfhd':
@@ -130,46 +131,50 @@ def box_factory(fp, header, parent):
         the_box = TrunBox(fp, header, parent)
     elif header.type == 'tfdt':
         the_box = TfdtBox(fp, header, parent)
-#    elif header.type == 'mfra':
-#        the_box = MfraBox(fp, header, parent)
-#    elif header.type == 'tfra':
-#        the_box = TfraBox(fp, header, parent)
-#    elif header.type == 'mfro':
-#        the_box = MfroBox(fp, header, parent)
+    elif header.type == 'mfra':
+        the_box = MfraBox(fp, header, parent)
+    elif header.type == 'tfra':
+        the_box = TfraBox(fp, header, parent)
+    elif header.type == 'mfro':
+        the_box = MfroBox(fp, header, parent)
     elif header.type == 'mdat':
         the_box = MdatBox(fp, header, parent)
     elif header.type == 'free':
         the_box = FreeBox(fp, header, parent)
     elif header.type == 'skip':
         the_box = SkipBox(fp, header, parent)
-#    elif header.type == 'cprt':
-#        the_box = CprtBox(fp, header, parent)
-#    elif header.type == 'tsel':
-#        the_box = TselBox(fp, header, parent)
-#    elif header.type == 'strk':
-#        the_box = StrkBox(fp, header, parent)
-#    elif header.type == 'stri':
-#        the_box = StriBox(fp, header, parent)
-#    elif header.type == 'strd':
-#       the_box = StrdBox(fp, header, parent)
-#    elif header.type == 'iloc':
-#        the_box = IlocBox(fp, header, parent)
-#    elif header.type == 'ipro':
-#        the_box = IproBox(fp, header, parent)
-#    elif header.type == 'sinf':
-#        the_box = SinfBox(fp, header, parent)
-#    elif header.type == 'frma':
-#        the_box = FrmaBox(fp, header, parent)
-#    elif header.type == 'schm:
-#       the_box = SchmBox(fp, header, parent)
+    elif header.type == 'cprt':
+        the_box = CprtBox(fp, header, parent)
+    elif header.type == 'tsel':
+        the_box = TselBox(fp, header, parent)
+    elif header.type == 'strk':
+        the_box = StrkBox(fp, header, parent)
+    elif header.type == 'stri':
+        the_box = StriBox(fp, header, parent)
+    elif header.type == 'strd':
+       the_box = StrdBox(fp, header, parent)
+    elif header.type == 'iloc':
+        the_box = IlocBox(fp, header, parent)
+    elif header.type == 'ipro':
+        the_box = IproBox(fp, header, parent)
+    elif header.type == 'rinf':
+        the_box = RinfBox(fp, header, parent)
+    elif header.type == 'sinf':
+        the_box = SinfBox(fp, header, parent)
+    elif header.type == 'frma':
+        the_box = FrmaBox(fp, header, parent)
+    elif header.type == 'schm':
+       the_box = SchmBox(fp, header, parent)
+#   This looks tedious to code up, won't bother unless I find it is currently extent
 #    elif header.type == 'iinf':
 #        the_box = IinfBox(fp, header, parent)
-#    elif header.type == 'xml ':
-#        the_box = Xml_Box(fp, header, parent)
+    elif header.type == 'xml ':
+        the_box = Xml_Box(fp, header, parent)
+#   Not sure anything useful can be displayed
 #    elif header.type == 'bxml':
 #        the_box = BxmlBox(fp, header, parent)
-#    elif header.type == 'pitm':
-#        the_box = PitmBox(fp, header, parent)
+    elif header.type == 'pitm':
+        the_box = PitmBox(fp, header, parent)
 #    elif header.type == 'fiin':
 #       the_box = FiinBox(fp, header, parent)
 #    elif header.type == 'paen':
@@ -180,18 +185,18 @@ def box_factory(fp, header, parent):
 #        the_box = FparBox(fp, header, parent)
 #    elif header.type == 'fecr':
 #        the_box = FecrBox(fp, header, parent)
-#    elif header.type == 'segr:
+#    elif header.type == 'segr':
 #       the_box = SegrBox(fp, header, parent)
 #    elif header.type == 'gitn':
 #        the_box = GitnBox(fp, header, parent)
 #    elif header.type == 'idat':
 #        the_box = IdatBox(fp, header, parent)
-#    elif header.type == 'iref:
-#       the_box = IrefBox(fp, header, parent)
-#    elif header.type == 'meco':
-#        the_box = MecoBox(fp, header, parent)
-#    elif header.type == 'mere':
-#        the_box = MereBox(fp, header, parent)
+    elif header.type == 'iref':
+        the_box = IrefBox(fp, header, parent)
+    elif header.type == 'meco':
+        the_box = MecoBox(fp, header, parent)
+    elif header.type == 'mere':
+        the_box = MereBox(fp, header, parent)
     elif header.type == 'styp':
         the_box = StypBox(fp, header, parent)
     elif header.type == 'sidx':
@@ -289,8 +294,9 @@ class ContainerBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
+# All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
-UdtaBox = TrgrBox = ContainerBox
+UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
 
 
 class MetaBox(Mp4FullBox):
@@ -353,6 +359,19 @@ class MfhdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['sequence_number'] = read_u32(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class MehdBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            if self.box_info['version'] == 1:
+                self.box_info['fragment_duration'] = read_u64(fp)
+            else:
+                self.box_info['fragment_duration'] = read_u32(fp)
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -431,6 +450,294 @@ class TfhdBox(Mp4FullBox):
             fp.seek(self.start_of_box + self.size)
 
 
+class TrexBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['track_ID'] = read_u32(fp)
+            self.box_info['default_sample_description_index'] = read_u32(fp)
+            self.box_info['default_sample_duration'] = read_u32(fp)
+            self.box_info['default_sample_size'] = read_u32(fp)
+            self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class LevaBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['level_count'] = read_u8(fp)
+            self.box_info['level_list'] = []
+            for i in range(self.box_info['level_count']):
+                level_dict = {'track_ID': read_u32(fp)}
+                pad_assign = read_u8(fp)
+                level_dict['padding_flag'] = pad_assign // 128
+                level_dict['assignment_type'] = pad_assign % 128
+                if level_dict['assignment_type'] == 0:
+                    level_dict['grouping_type'] = fp.read(4).decode('utf-8')
+                elif level_dict['assignment_type'] == 1:
+                    level_dict['grouping_type'] = fp.read(4).decode('utf-8')
+                    level_dict['grouping_type_parameter'] = read_u32(fp)
+                elif level_dict['assignment_type'] == 4:
+                    level_dict['sub_track_id'] = read_u32(fp)
+                self.box_info['level_list'].append(level_dict)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class TfraBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['track_ID'] = read_u32(fp)
+            length_fields = read_u32(fp)
+            self.box_info['length_size_of_traf_num'] = length_fields % 64 // 16
+            self.box_info['length_size_of_trun_num'] = length_fields % 16 // 4
+            self.box_info['length_size_of_sample_num'] = length_fields % 16 // 4
+            self.box_info['number_of_entry'] = read_u32(fp)
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['number_of_entry']):
+                entry_dict = {}
+                if self.box_info['version'] == 1:
+                    entry_dict['time'] = read_u64(fp)
+                    entry_dict['moof_offset'] = read_u64(fp)
+                else:
+                    entry_dict['time'] = read_u32(fp)
+                    entry_dict['moof_offset'] = read_u32(fp)
+                if self.box_info['length_size_of_traf_num'] == 0:
+                    entry_dict['traf_number'] = read_u8(fp)
+                elif self.box_info['length_size_of_traf_num'] == 1:
+                    entry_dict['traf_number'] = read_u16(fp)
+                elif self.box_info['length_size_of_traf_num'] == 3:
+                    entry_dict['traf_number'] = read_u32(fp)
+                if self.box_info['length_size_of_trun_num'] == 0:
+                    entry_dict['trun_number'] = read_u8(fp)
+                elif self.box_info['length_size_of_trun_num'] == 1:
+                    entry_dict['trun_number'] = read_u16(fp)
+                elif self.box_info['length_size_of_trun_num'] == 3:
+                    entry_dict['trun_number'] = read_u32(fp)
+                if self.box_info['length_size_of_sample_num'] == 0:
+                    entry_dict['sample_number'] = read_u8(fp)
+                elif self.box_info['length_size_of_sample_num'] == 1:
+                    entry_dict['sample_number'] = read_u16(fp)
+                elif self.box_info['length_size_of_sample_num'] == 3:
+                    entry_dict['sample_number'] = read_u32(fp)
+                self.box_info['entry_list'].append(entry_dict)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class MfroBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['size'] = read_u32(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class CprtBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            # I think this is right
+            lang = struct.unpack('>H', fp.read(2))[0]
+            if lang == 0:
+                self.box_info['language'] = '0x00'
+            else:
+                ch1 = str(chr(60 + (lang % 32768 // 1024)))
+                ch2 = str(chr(60 + (lang % 1024 // 32)))
+                ch3 = str(chr(60 + (lang % 32)))
+                self.box_info['language'] = ch1 + ch2 + ch3
+            bytes_left = self.size - (self.header.header_size + 2)
+            self.box_info['name'] = fp.read(bytes_left).decode('utf-8', errors="ignore")
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class TselBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['switch_group'] = read_u32(fp)
+            bytes_left = self.size - (self.header.length + 8)
+            attr_list = []
+            while bytes_left > 0:
+                attr_list.append(fp.read(4).decode('utf-8'))
+                bytes_left -= 4
+            self.box_info['attributes'] = attr_list
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+
+class StriBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['switch_group'] = read_u16(fp)
+            self.box_info['alternate_group'] = read_u16(fp)
+            self.box_info['sub_track_ID'] = read_u32(fp)
+            bytes_left = self.size - (self.header.length + 12)
+            attr_list = []
+            while bytes_left > 0:
+                attr_list.append(fp.read(4).decode('utf-8'))
+                bytes_left -= 4
+            self.box_info['attributes'] = attr_list
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class IlocBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['offset_size'] = read_u32(fp)
+            self.box_info['length_size'] = read_u32(fp)
+            self.box_info['base_offset_size'] = read_u32(fp)
+            if self.box_info['version'] == 1 or self.box_info['version'] == 2:
+                self.box_info['index_size'] = read_u32(fp)
+            else:
+                self.box_info['reserved'] = read_u32(fp)
+            if self.box_info['version'] < 2:
+                self.box_info['item_count'] = read_u16(fp)
+            elif self.box_info['version'] == 2:
+                self.box_info['item_count'] = read_u32(fp)
+            self.box_info['item_list'] = []
+            for i in range(self.box_info['item_count']):
+                item = {}
+                if self.box_info['version'] < 2:
+                    item['item_ID'] = read_u16(fp)
+                elif self.box_info['version'] == 2:
+                    item['item_ID'] = read_u32(fp)
+                if self.box_info['version'] == 1 or self.box_info['version'] == 2:
+                    item['construction_method'] = read_u16(fp) % 16
+                item['data_reference_index'] = read_u16(fp)
+                if self.box_info['offset_size'] == 4:
+                    item['base_offset'] = read_u32(fp)
+                elif self.box_info['offset_size'] == 8:
+                    item['base_offset'] = read_u64(fp)
+                item['extent_count'] = read_u16(fp)
+                item['extent_list'] = []
+                for j in range(item['extent_count']):
+                    extent = {}
+                    if self.box_info['version'] == 1 or self.box_info['version'] == 2:
+                        if self.box_info['index_size'] == 4:
+                            extent['extent_index'] = read_u32(fp)
+                        elif self.box_info['index_size'] == 8:
+                            extent['extent_index'] = read_u64(fp)
+                    if self.box_info['offset_size'] == 4:
+                        extent['extent_offset'] = read_u32(fp)
+                    elif self.box_info['offset_size'] == 8:
+                        extent['extent_offset'] = read_u64(fp)
+                    if self.box_info['length_size'] == 4:
+                        extent['extent_length'] = read_u32(fp)
+                    elif self.box_info['length_size'] == 8:
+                        extent['extent_length'] = read_u64(fp)
+                    item['extent_list'].append(extent)
+                self.box_info['item_list'].append(item)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class IproBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['protection_count'] = read_u16(fp)
+            for i in range(self.box_info['protection_count']):
+                current_header = Header(fp)
+                current_box = box_factory(fp, current_header, self)
+                self.child_boxes.append(current_box)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class FrmaBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['data_format'] = fp.read(4).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class SchmBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['scheme_type'] = fp.read(4).decode('utf-8')
+            self.box_info['scheme_version'] = read_u32(fp)
+            if int(self.box_info['flags'][-1]) & 1 == 1:
+                self.box_info['data_offset'] = fp.read(self.size - (self.header.length + 12)).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class Xml_Box(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['xml_data'] = fp.read(self.size - (self.header.length + 4)).decode('utf-8', errors="ignore")
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class PitmBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            if self.box_info['version'] == 0:
+                self.box_info['item_ID'] = read_u16(fp)
+            else:
+                self.box_info['item_ID'] = read_u32(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+# This is just a versioned container box
+class IrefBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            bytes_left = self.size - self.header.header_size
+            while bytes_left > 7:
+                current_header = Header(fp)
+                current_box = box_factory(fp, current_header, self)
+                self.child_boxes.append(current_box)
+                bytes_left -= current_box.size
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class MereBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['first_metabox_handler_type'] = fp.read(4).decode('utf-8')
+            self.box_info['second_metabox_handler_type'] = fp.read(4).decode('utf-8')
+            self.box_info['metabox_relation'] = read_u8(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+
 class TrunBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
@@ -444,7 +751,7 @@ class TrunBox(Mp4FullBox):
             if int(self.box_info['flags'][-1]) & 1 == 1:
                 self.box_info['data_offset'] = read_i32(fp)
             if int(self.box_info['flags'][-1]) & 4 == 4:
-                self.box_info['first_sample_flags'] = read_u32(fp)
+                self.box_info['first_sample_flags'] = "{0:#08x}".format(read_u32(fp))
             if int(self.box_info['flags'][-3]) & 1 == 1:
                 has_sample_duration = True
             if int(self.box_info['flags'][-3]) & 2 == 2:
@@ -739,7 +1046,23 @@ class StssBox(Mp4FullBox):
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
-                self.box_info['entry_list'].append({'sample_count': read_u32(fp), 'sample_delta': read_u32(fp)})
+                self.box_info['entry_list'].append({'sample_number': read_u32(fp)})
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class StshBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['entry_count']):
+                self.box_info['entry_list'].append({
+                                                    'shadowed_sample_number': read_u32(fp),
+                                                    'sync_sample_number': read_u32(fp)
+                                                    })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -841,7 +1164,7 @@ class SbgpBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            self.box_info['grouping_type'] = read_u32(fp)
+            self.box_info['grouping_type'] = fp.read(4).decode('utf-8')
             if self.box_info['version'] == 1:
                 self.box_info['grouping_type_parameter'] = read_u32(fp)
             self.box_info['entry_count'] = read_u32(fp)
@@ -851,6 +1174,29 @@ class SbgpBox(Mp4FullBox):
                                                     'sample_count': read_u32(fp),
                                                     'group_description_index': read_u32(fp)
                                                   })
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class SgpdBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['grouping_type'] = fp.read(4).decode('utf-8')
+            if self.box_info['version'] == 1:
+                self.box_info['default_length'] = read_u32(fp)
+            elif self.box_info['version'] >= 2:
+                self.box_info['default_sample_description_index'] = read_u32(fp)
+            self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['entry_count']):
+                if self.box_info['default_length'] == 0 and self.box_info['version'] == 1:
+                    description_length = read_u32(fp)
+                else:
+                    description_length = self.box_info['default_length']
+                sample_group_entry = binascii.b2a_hex(fp.read(description_length)).decode('utf-8')
+                self.box_info['entry_list'].append({'sample_group_entry': sample_group_entry})
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -865,7 +1211,29 @@ class SaizBox(Mp4FullBox):
                 self.box_info['aux_info_type_parameter'] = read_u32(fp)
             self.box_info['default_sample_info_size'] = read_u8(fp)
             self.box_info['sample_count'] = read_u32(fp)
-            # TODO spec is unclear, is it an array?
+            if self.box_info['default_sample_info_size'] == 0:
+                self.box_info['sample_info_size_list'] = []
+                for i in range(self.box_info['sample_count']):
+                    self.box_info['sample_info_size_list'].append({'sample_info_size': read_u8(fp)})
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class SaioBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            if int(self.box_info['flags'][-1]) == 1:
+                self.box_info['aux_info_type'] = read_u32(fp)
+                self.box_info['aux_info_type_parameter'] = read_u32(fp)
+            self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['offset_list'] = []
+            for i in range(self.box_info['entry_count']):
+                if self.box_info['version'] == 0:
+                    self.box_info['offset_list'].append({'offset': read_u32(fp)})
+                else:
+                    self.box_info['offset_list'].append({'offset': read_u64(fp)})
         finally:
             fp.seek(self.start_of_box + self.size)
 
