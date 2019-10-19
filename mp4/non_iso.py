@@ -29,8 +29,16 @@ def box_factory_non_iso(fp, header, parent):
         the_box = PaspBox(fp, header, parent)
     elif header.type == 'mp4a':
         the_box = Mp4aBox(fp, header, parent)
+    elif header.type == 'ac-3' or header.type == 'AC-3':
+        the_box = Ac_3Box(fp, header, parent)
+    elif header.type == 'ec-3' or header.type == 'EC-3':
+        the_box = Ec_3Box(fp, header, parent)
     elif header.type == 'esds':
         the_box = EsdsBox(fp, header, parent)
+    elif header.type == 'dac3':
+        the_box = Dac3Box(fp, header, parent)
+    elif header.type == 'dec3':
+        the_box = Dec3Box(fp, header, parent)
     elif header.type == 'ilst':
         the_box = IlstBox(fp, header, parent)
     elif header.type == 'data':
@@ -70,6 +78,7 @@ class Avc1Box(Mp4FullBox):
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 0 and read_i16(fp) != -1:
                 bytes_left -= 2
+            bytes_left -= 2 # need this because there is no do ...until in Python
             fp.seek(-4, 1)
             self.box_info['depth'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['pre-defined'] = read_i16(fp)
@@ -224,6 +233,9 @@ class Mp4aBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
+Ac_3Box = Ec_3Box = Mp4aBox
+
+
 class EsdsBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
@@ -231,6 +243,50 @@ class EsdsBox(Mp4FullBox):
         try:
             self.box_info['elementary_stream_descriptor'] = \
                 binascii.b2a_hex(fp.read(self.size -(self.header.header_size + 4))).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class Dac3Box(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            my_data = struct.unpack('>I', b'\0' + fp.read(3))[0]
+            self.box_info['fscod'] = my_data % 16777216 // 4194304
+            self.box_info['bsid'] = my_data % 4194304 // 131072
+            self.box_info['bsmod'] = my_data % 131072 // 16384
+            self.box_info['acmod'] = my_data % 16384 // 2048
+            self.box_info['lfeon'] = my_data % 2048 // 1024
+            self.box_info['bit_rate_code'] = my_data % 1024 // 32
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class Dec3Box(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            my_data_sub = read_u16(fp)
+            self.box_info['data_rate'] = my_data_sub // 8
+            self.box_info['num_ind_sub'] = my_data_sub % 8
+            self.box_info['ind_sub_list'] = []
+            for i in range(self.box_info['num_ind_sub']):
+                in_s = read_u16(fp)
+                fscod = in_s // 16384
+                bsid = in_s % 16384 // 512
+                bsmod = in_s % 512 // 16
+                acmod = in_s % 16 // 2
+                lfeon = in_s & 1
+                dep_s = read_u8(fp)
+                num_dep_sub = dep_s % 32 // 2
+                bit_9 = dep_s & 1
+                sub_dict = {'fscod': fscod, 'bsid': bsid, 'bsmod': bsmod, 'acmod': acmod,
+                            'lfeon': lfeon, 'num_dep_sub': num_dep_sub}
+                if num_dep_sub > 0:
+                    sub_dict['chan_loc'] = (bit_9 * 512) + read_u8(fp)
+                self.box_info['ind_sub_list'].append(sub_dict)
         finally:
             fp.seek(self.start_of_box + self.size)
 

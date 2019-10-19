@@ -153,6 +153,8 @@ class MyApp(Tk):
         """ Callback on selecting 'Open' from menu """
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4a .m4p .m4b .m4r .m4v"),
                                                          ("All Files", "*.*")), initialdir=self.dialog_dir)
+        if filename == ():
+            return
         logging.debug("Loading file " + filename)
         self.statustext.set("Loading...")
         self.update_idletasks()
