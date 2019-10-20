@@ -54,8 +54,8 @@ class MyApp(Tk):
     def __init__(self):
         super().__init__()
         # uncomment desired logging level
-        # logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.DEBUG)
-        logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
+        logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.DEBUG)
+        # logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
 
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")
@@ -153,6 +153,8 @@ class MyApp(Tk):
         """ Callback on selecting 'Open' from menu """
         filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4a .m4p .m4b .m4r .m4v"),
                                                          ("All Files", "*.*")), initialdir=self.dialog_dir)
+        if filename == ():
+            return
         logging.debug("Loading file " + filename)
         self.statustext.set("Loading...")
         self.update_idletasks()
