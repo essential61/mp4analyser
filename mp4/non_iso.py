@@ -45,6 +45,8 @@ def box_factory_non_iso(fp, header, parent):
         the_box = DataBox(fp, header, parent)
     elif header.type == 'pssh':
         the_box = PsshBox(fp, header, parent)
+    elif header.type == 'senc':
+        the_box = SencBox(fp, header, parent)
     else:
         the_box = UndefinedBox(fp, header, parent)
     return the_box
@@ -149,8 +151,8 @@ class HvcCBox(Mp4Box):
         try:
             self.box_info['configuration_version'] = read_u8(fp)
             profile_info = read_u8(fp)
-            self.box_info['general_profile_space'] = profile_info // 64
-            self.box_info['general_tier_flag'] = profile_info % 64 // 32
+            self.box_info['general_profile_space'] = profile_info >> 6
+            self.box_info['general_tier_flag'] = profile_info >> 5 & 1
             self.box_info['general_profile_idc'] = profile_info % 32
             self.box_info['general_profile_compatibility_flags'] = "{0:#010x}".format(read_u32(fp))
             self.box_info['general_constraint_indicator_flags'] = "0x" + binascii.b2a_hex(fp.read(6)).decode('utf-8')
@@ -162,15 +164,15 @@ class HvcCBox(Mp4Box):
             self.box_info['bit_depth_chroma_minus8'] = read_u8(fp) % 8
             self.box_info['avg_frame_rate'] = read_u16(fp)
             fr = read_u8(fp)
-            self.box_info['constant_frame_rate'] = fr // 64
-            self.box_info['num_temporal_layers'] = fr % 64 // 8
-            self.box_info['temporal_id_nested'] = fr % 8 // 4
+            self.box_info['constant_frame_rate'] = fr >> 6
+            self.box_info['num_temporal_layers'] = fr >> 3 % 8
+            self.box_info['temporal_id_nested'] = fr >> 2 & 1
             self.box_info['length_size_minus1'] = fr % 4
             self.box_info['num_of_arrays'] = read_u8(fp)
             self.box_info['array_list'] = []
             for i in range(self.box_info['num_of_arrays']):
                 nt = read_u8(fp)
-                nal_dict = {'array_completeness': nt // 128, 'NAL_unit_type': nt % 64}
+                nal_dict = {'array_completeness': nt >> 7, 'NAL_unit_type': nt % 64}
                 nal_dict['num_nalus'] = read_u16(fp)
                 nal_dict['nalu_list'] = []
                 for j in range(nal_dict['num_nalus']):
@@ -253,12 +255,12 @@ class Dac3Box(Mp4Box):
         super().__init__(fp, header, parent)
         try:
             my_data = struct.unpack('>I', b'\0' + fp.read(3))[0]
-            self.box_info['fscod'] = my_data % 16777216 // 4194304
-            self.box_info['bsid'] = my_data % 4194304 // 131072
-            self.box_info['bsmod'] = my_data % 131072 // 16384
-            self.box_info['acmod'] = my_data % 16384 // 2048
-            self.box_info['lfeon'] = my_data % 2048 // 1024
-            self.box_info['bit_rate_code'] = my_data % 1024 // 32
+            self.box_info['fscod'] = my_data >> 22
+            self.box_info['bsid'] = my_data >> 17 % 32
+            self.box_info['bsmod'] = my_data >> 14 % 8
+            self.box_info['acmod'] = my_data >> 11 % 8
+            self.box_info['lfeon'] = my_data >> 10 & 1
+            self.box_info['bit_rate_code'] = my_data >> 5 % 32
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -269,20 +271,21 @@ class Dec3Box(Mp4Box):
         super().__init__(fp, header, parent)
         try:
             my_data_sub = read_u16(fp)
-            self.box_info['data_rate'] = my_data_sub // 8
+            self.box_info['data_rate'] = my_data_sub >> 3
             self.box_info['num_ind_sub'] = my_data_sub % 8
             self.box_info['ind_sub_list'] = []
             for i in range(self.box_info['num_ind_sub']):
                 in_s = read_u16(fp)
-                fscod = in_s // 16384
-                bsid = in_s % 16384 // 512
-                bsmod = in_s % 512 // 16
-                acmod = in_s % 16 // 2
+                fscod = in_s >> 14
+                bsid = in_s >> 9 % 32
+                asvc = in_s >> 7 & 1
+                bsmod = in_s >> 4 % 8
+                acmod = in_s >> 1 % 8
                 lfeon = in_s & 1
                 dep_s = read_u8(fp)
-                num_dep_sub = dep_s % 32 // 2
+                num_dep_sub = dep_s >> 1 % 16
                 bit_9 = dep_s & 1
-                sub_dict = {'fscod': fscod, 'bsid': bsid, 'bsmod': bsmod, 'acmod': acmod,
+                sub_dict = {'fscod': fscod, 'bsid': bsid, 'asvc': asvc, 'bsmod': bsmod, 'acmod': acmod,
                             'lfeon': lfeon, 'num_dep_sub': num_dep_sub}
                 if num_dep_sub > 0:
                     sub_dict['chan_loc'] = (bit_9 * 512) + read_u8(fp)
@@ -299,7 +302,7 @@ class IlstBox(Mp4Box):
             self.box_info['offset'] = read_u32(fp)
             my_4bytes = fp.read(4)
             # WTF! a non-printing character in the box type.
-            if (struct.unpack('>I', my_4bytes)[0]) // 16777216 == 169:
+            if (struct.unpack('>I', my_4bytes)[0]) >> 24 == 169:
                 self.box_info['box_type'] = my_4bytes[1:].decode('utf-8')
             else:
                 self.box_info['box_type'] = my_4bytes.decode('utf-8')
@@ -330,9 +333,49 @@ class PsshBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['system_id'] = binascii.b2a_hex(fp.read(16)).decode('utf-8')
-            self.box_info['key_count'] = read_u32(fp)
-            self.box_info['key_list'] = []
-            for i in range(self.box_info['key_count']):
-                self.box_info['key_list'].append(binascii.b2a_hex(fp.read(16)).decode('utf-8'))
+            if self.box_info['system_id'] == '1077efecc0b24d02ace33c1e52e2fb4b':
+                # it is cenc
+                self.box_info['key_count'] = read_u32(fp)
+                self.box_info['key_list'] = []
+                for i in range(self.box_info['key_count']):
+                    self.box_info['key_list'].append(binascii.b2a_hex(fp.read(16)).decode('utf-8'))
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class SencBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['sample_count'] = read_u32(fp)
+            iv_size_guess = ((self.size - 16) // self.box_info['sample_count'])
+            if int(self.box_info['flags'][-1], 16) & 2:
+                # I don't think this logic is infallible
+                if iv_size_guess < 10:
+                    iv_size = 0
+                elif 10 <= iv_size_guess < 18:
+                    iv_size = 8
+                else:
+                    iv_size = 16
+                self.box_info['iv_size'] = iv_size
+                self.box_info['sample_list'] = []
+                for i in range(self.box_info['sample_count']):
+                    sample_dict = {}
+                    sample_dict['iv'] = binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')
+                    sample_dict['subsample_count'] = read_u16(fp)
+                    sample_dict['subsample_list'] = []
+                    for j in range(sample_dict['subsample_count']):
+                        sample_dict['subsample_list'].append({
+                                                            'BytesOfClearData': read_u16(fp),
+                                                            'BytesOfEncryptedData': read_u32(fp)
+                                                            })
+                    self.box_info['sample_list'].append(sample_dict)
+            else:
+                iv_size = iv_size_guess
+                self.box_info['iv_size'] = iv_size
+                self.box_info['sample_list'] = []
+                for i in range(self.box_info['sample_count']):
+                    self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')})
         finally:
             fp.seek(self.start_of_box + self.size)
