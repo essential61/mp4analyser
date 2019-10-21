@@ -423,7 +423,6 @@ class TkhdBox(Mp4FullBox):
             self.box_info['volume'] = read_u8_8(fp)
             fp.seek(2, 1)
             self.box_info['matrix'] = ["{0:#010x}".format(b) for b in struct.unpack('>9I', fp.read(36))]
-            fp.seek(24, 1)
             self.box_info['width'] = read_u16_16(fp)
             self.box_info['height'] = read_u16_16(fp)
         finally:
