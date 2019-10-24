@@ -220,9 +220,12 @@ class Mp4File:
         with open(filename, 'rb') as f:
             end_of_file = False
             while not end_of_file:
+                # test to see if performance improvement
+                old_f = f.tell()
                 current_header = Header(f)
                 current_box = box_factory(f, current_header, self)
                 self.child_boxes.append(current_box)
+                f.seek(old_f + current_box.size)
                 if current_box.size == 0:
                     end_of_file = True
                 if len(f.read(4)) != 4:
@@ -284,6 +287,9 @@ class ContainerBox(Mp4Box):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
+            # test to see if performance improvement
+            if self.parent == 'file':
+                fp = PseudoFile(self.byte_string, self.start_of_box)
             bytes_left = self.size - self.header.header_size
             while bytes_left > 7:
                 current_header = Header(fp)

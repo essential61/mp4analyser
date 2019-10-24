@@ -193,7 +193,7 @@ class MyApp(Tk):
                                                                                           l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
-        logging.debug("Finished populating " + filename)
+        logging.debug("Finished populating tree " + filename)
         self.statustext.set("")
 
     def select_box(self, a):

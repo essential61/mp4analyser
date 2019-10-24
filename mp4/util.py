@@ -55,3 +55,30 @@ def read_i8_8(fp):
     return ipart + (fpart / 256)
 
 
+# test to see if performance improvement
+class PseudoFile():
+    """
+    Implements some of Python's File class methods (seek, tell, read) but in fact pulls data from the byte array of
+    a top-level container, speeding up access
+    """
+    def __init__(self, byte_array, f_offset):
+        self.byte_array = byte_array
+        self.f_offset = f_offset
+        self.bp = f_offset
+
+    def seek(self, off, whence = 0):
+        if whence == 0:
+            self.bp = off
+        elif whence == 1:
+            self.bp += off
+        elif whence == 2:
+            self.bp = self.f_offset + len(self.byte_array) + off
+
+    def tell(self):
+        return self.bp
+
+    def read(self, num_of_bytes):
+        p1 = self.bp - self.f_offset
+        ret_val = self.byte_array[p1: p1 + num_of_bytes]
+        self.bp += num_of_bytes
+        return ret_val
