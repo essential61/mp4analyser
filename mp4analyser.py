@@ -159,6 +159,7 @@ class MyApp(Tk):
         self.statustext.set("Loading...")
         self.update_idletasks()
         self.mp4file = mp4.iso.Mp4File(filename)
+        logging.debug("Finished loading file " + filename)
         self.dialog_dir, filename_base = os.path.split(filename)
         self.title("MP4 Analyser" + " - " + filename_base)
         # Clear tree and text widgets if not empty
@@ -192,7 +193,7 @@ class MyApp(Tk):
                                                                                           l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
-        logging.debug("Finished loading file " + filename)
+        logging.debug("Finished populating " + filename)
         self.statustext.set("")
 
     def select_box(self, a):
