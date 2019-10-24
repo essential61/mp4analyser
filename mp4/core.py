@@ -21,7 +21,6 @@ class Mp4Box:
                 self.byte_string = fp.read(1000001)
             else:
                 self.byte_string = fp.read(self.size)
-            fp.seek(self.start_of_box)
         fp.seek(self.start_of_box + self.header.header_size)
 
     @property
