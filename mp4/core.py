@@ -68,7 +68,7 @@ class Header:
         """
         start_of_box = fp.tell()
         self._size = read_u32(fp)
-        self.type = fp.read(4).decode('utf-8')
+        self.type = fp.read(4).decode('utf-8', errors="ignore")
         if self._size == 1:
             self._largesize = read_u64(fp)
         if self.type == 'uuid':
