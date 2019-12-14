@@ -735,7 +735,6 @@ class MereBox(Mp4FullBox):
             fp.seek(self.start_of_box + self.size)
 
 
-
 class TrunBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
