@@ -152,7 +152,7 @@ def box_factory(fp, header, parent):
     elif header.type == 'stri':
         the_box = StriBox(fp, header, parent)
     elif header.type == 'strd':
-       the_box = StrdBox(fp, header, parent)
+        the_box = StrdBox(fp, header, parent)
     elif header.type == 'iloc':
         the_box = IlocBox(fp, header, parent)
     elif header.type == 'ipro':
@@ -164,7 +164,7 @@ def box_factory(fp, header, parent):
     elif header.type == 'frma':
         the_box = FrmaBox(fp, header, parent)
     elif header.type == 'schm':
-       the_box = SchmBox(fp, header, parent)
+        the_box = SchmBox(fp, header, parent)
 #   This looks tedious to code up, won't bother unless I find it is currently extent
 #    elif header.type == 'iinf':
 #        the_box = IinfBox(fp, header, parent)
@@ -494,9 +494,9 @@ class TfraBox(Mp4FullBox):
         try:
             self.box_info['track_ID'] = read_u32(fp)
             length_fields = read_u32(fp)
-            self.box_info['length_size_of_traf_num'] = length_fields >> 6 % 4
-            self.box_info['length_size_of_trun_num'] = length_fields >> 4 % 4
-            self.box_info['length_size_of_sample_num'] = length_fields >> 2 % 4
+            self.box_info['length_size_of_traf_num'] = length_fields >> 4 & 3
+            self.box_info['length_size_of_trun_num'] = length_fields >> 2 & 3
+            self.box_info['length_size_of_sample_num'] = length_fields & 3
             self.box_info['number_of_entry'] = read_u32(fp)
             self.box_info['entry_list'] = []
             for i in range(self.box_info['number_of_entry']):
@@ -550,8 +550,8 @@ class CprtBox(Mp4FullBox):
             if lang == 0:
                 self.box_info['language'] = '0x00'
             else:
-                ch1 = str(chr(60 + (lang >> 10 % 32)))
-                ch2 = str(chr(60 + (lang >> 5 % 32)))
+                ch1 = str(chr(60 + (lang >> 10 & 31)))
+                ch2 = str(chr(60 + (lang >> 5 & 31)))
                 ch3 = str(chr(60 + (lang % 32)))
                 self.box_info['language'] = ch1 + ch2 + ch3
             bytes_left = self.size - (self.header.header_size + 2)
@@ -574,7 +574,6 @@ class TselBox(Mp4FullBox):
             self.box_info['attributes'] = attr_list
         finally:
             fp.seek(self.start_of_box + self.size)
-
 
 
 class StriBox(Mp4FullBox):
@@ -819,8 +818,8 @@ class MdhdBox(Mp4FullBox):
             if lang == 0:
                 self.box_info['language'] = '0x00'
             else:
-                ch1 = str(chr(60 + (lang >> 10 % 32)))
-                ch2 = str(chr(60 + (lang >> 5 % 32)))
+                ch1 = str(chr(60 + (lang >> 10 & 31)))
+                ch2 = str(chr(60 + (lang >> 5 & 31)))
                 ch3 = str(chr(60 + (lang % 32)))
                 self.box_info['language'] = ch1 + ch2 + ch3
         finally:
@@ -1307,9 +1306,9 @@ class SdtpBox(Mp4FullBox):
         for i in range(sc):
             the_byte = read_u8(fp)
             is_leading = the_byte >> 6
-            depends_on = the_byte >> 4 % 4
-            is_depended_on = the_byte >> 2 % 4
-            has_redundancy = the_byte % 4
+            depends_on = the_byte >> 4 & 3
+            is_depended_on = the_byte >> 2 & 3
+            has_redundancy = the_byte & 3
             self.box_info['sample_list'].append({
                                                 'is_leading': is_leading,
                                                 'sample_depends_on': depends_on,
@@ -1344,7 +1343,7 @@ class SidxBox(Mp4FullBox):
                                                         'reference_size': rt_sz % 2147483648,
                                                         'subsegment_duration': subsegment_dur,
                                                         'starts_with_sap': st_sz >> 31,
-                                                        'SAP_type': st_sz >> 28 % 8,
+                                                        'SAP_type': st_sz >> 28 & 7,
                                                         'SAP_delta_time': st_sz % 268435456
                                                       })
         finally:

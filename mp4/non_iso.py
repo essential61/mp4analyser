@@ -80,7 +80,7 @@ class Avc1Box(Mp4FullBox):
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 0 and read_i16(fp) != -1:
                 bytes_left -= 2
-            bytes_left -= 2 # need this because there is no do ...until in Python
+            bytes_left -= 2    # need this because there is no do ...until in Python
             fp.seek(-4, 1)
             self.box_info['depth'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['pre-defined'] = read_i16(fp)
@@ -153,7 +153,7 @@ class HvcCBox(Mp4Box):
             profile_info = read_u8(fp)
             self.box_info['general_profile_space'] = profile_info >> 6
             self.box_info['general_tier_flag'] = profile_info >> 5 & 1
-            self.box_info['general_profile_idc'] = profile_info % 32
+            self.box_info['general_profile_idc'] = profile_info & 31
             self.box_info['general_profile_compatibility_flags'] = "{0:#010x}".format(read_u32(fp))
             self.box_info['general_constraint_indicator_flags'] = "0x" + binascii.b2a_hex(fp.read(6)).decode('utf-8')
             self.box_info['general_level_idc'] = read_u8(fp)
@@ -165,9 +165,9 @@ class HvcCBox(Mp4Box):
             self.box_info['avg_frame_rate'] = read_u16(fp)
             fr = read_u8(fp)
             self.box_info['constant_frame_rate'] = fr >> 6
-            self.box_info['num_temporal_layers'] = fr >> 3 % 8
+            self.box_info['num_temporal_layers'] = fr >> 3 & 7
             self.box_info['temporal_id_nested'] = fr >> 2 & 1
-            self.box_info['length_size_minus1'] = fr % 4
+            self.box_info['length_size_minus1'] = fr & 3
             self.box_info['num_of_arrays'] = read_u8(fp)
             self.box_info['array_list'] = []
             for i in range(self.box_info['num_of_arrays']):
@@ -244,7 +244,7 @@ class EsdsBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['elementary_stream_descriptor'] = \
-                binascii.b2a_hex(fp.read(self.size -(self.header.header_size + 4))).decode('utf-8')
+                binascii.b2a_hex(fp.read(self.size - (self.header.header_size + 4))).decode('utf-8')
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -256,11 +256,11 @@ class Dac3Box(Mp4Box):
         try:
             my_data = struct.unpack('>I', b'\0' + fp.read(3))[0]
             self.box_info['fscod'] = my_data >> 22
-            self.box_info['bsid'] = my_data >> 17 % 32
-            self.box_info['bsmod'] = my_data >> 14 % 8
-            self.box_info['acmod'] = my_data >> 11 % 8
+            self.box_info['bsid'] = my_data >> 17 & 31
+            self.box_info['bsmod'] = my_data >> 14 & 7
+            self.box_info['acmod'] = my_data >> 11 & 7
             self.box_info['lfeon'] = my_data >> 10 & 1
-            self.box_info['bit_rate_code'] = my_data >> 5 % 32
+            self.box_info['bit_rate_code'] = my_data >> 5 % 31
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -272,18 +272,18 @@ class Dec3Box(Mp4Box):
         try:
             my_data_sub = read_u16(fp)
             self.box_info['data_rate'] = my_data_sub >> 3
-            self.box_info['num_ind_sub'] = my_data_sub % 8
+            self.box_info['num_ind_sub'] = my_data_sub & 7
             self.box_info['ind_sub_list'] = []
             for i in range(self.box_info['num_ind_sub']):
                 in_s = read_u16(fp)
                 fscod = in_s >> 14
-                bsid = in_s >> 9 % 32
+                bsid = in_s >> 9 & 31
                 asvc = in_s >> 7 & 1
-                bsmod = in_s >> 4 % 8
-                acmod = in_s >> 1 % 8
+                bsmod = in_s >> 4 & 7
+                acmod = in_s >> 1 & 7
                 lfeon = in_s & 1
                 dep_s = read_u8(fp)
-                num_dep_sub = dep_s >> 1 % 16
+                num_dep_sub = dep_s >> 1 & 15
                 bit_9 = dep_s & 1
                 sub_dict = {'fscod': fscod, 'bsid': bsid, 'asvc': asvc, 'bsmod': bsmod, 'acmod': acmod,
                             'lfeon': lfeon, 'num_dep_sub': num_dep_sub}
@@ -361,10 +361,8 @@ class SencBox(Mp4FullBox):
                 self.box_info['iv_size'] = iv_size
                 self.box_info['sample_list'] = []
                 for i in range(self.box_info['sample_count']):
-                    sample_dict = {}
-                    sample_dict['iv'] = binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')
-                    sample_dict['subsample_count'] = read_u16(fp)
-                    sample_dict['subsample_list'] = []
+                    sample_dict = {'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8'),
+                                   'subsample_count': read_u16(fp), 'subsample_list': []}
                     for j in range(sample_dict['subsample_count']):
                         sample_dict['subsample_list'].append({
                                                             'BytesOfClearData': read_u16(fp),
