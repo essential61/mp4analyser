@@ -15,40 +15,16 @@ from mp4.core import *
 
 def box_factory_non_iso(fp, header, parent):
     the_box = None
-    if header.type == 'avc1':
-        the_box = Avc1Box(fp, header, parent)
-    elif header.type == 'hvc1':
-        the_box = Hvc1Box(fp, header, parent)
-    elif header.type == 'avcC':
-        the_box = AvcCBox(fp, header, parent)
-    elif header.type == 'hvcC':
-        the_box = HvcCBox(fp, header, parent)
-    elif header.type == 'btrt':
-        the_box = BtrtBox(fp, header, parent)
-    elif header.type == 'pasp':
-        the_box = PaspBox(fp, header, parent)
-    elif header.type == 'mp4a':
-        the_box = Mp4aBox(fp, header, parent)
-    elif header.type == 'ac-3' or header.type == 'AC-3':
-        the_box = Ac_3Box(fp, header, parent)
-    elif header.type == 'ec-3' or header.type == 'EC-3':
-        the_box = Ec_3Box(fp, header, parent)
-    elif header.type == 'esds':
-        the_box = EsdsBox(fp, header, parent)
-    elif header.type == 'dac3':
-        the_box = Dac3Box(fp, header, parent)
-    elif header.type == 'dec3':
-        the_box = Dec3Box(fp, header, parent)
-    elif header.type == 'ilst':
-        the_box = IlstBox(fp, header, parent)
-    elif header.type == 'data':
-        the_box = DataBox(fp, header, parent)
-    elif header.type == 'pssh':
-        the_box = PsshBox(fp, header, parent)
-    elif header.type == 'senc':
-        the_box = SencBox(fp, header, parent)
+    box_type = header.type
+    box_type.replace(' ', '_')
+    if box_type == 'AC-3' or box_type == 'EC-3':
+        box_type = box_type.lower()
+    _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table
+    if _box_class:
+        the_box = _box_class(fp, header, parent)
     else:
         the_box = UndefinedBox(fp, header, parent)
+
     return the_box
 
 
