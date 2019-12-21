@@ -31,8 +31,7 @@ def box_factory(fp, header, parent):
     an instance of that class.
     """
     the_box = None
-    box_type = header.type
-    box_type.replace(' ', '_')
+    box_type = header.type.replace(" ", "_")
     _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table
     if _box_class:
         the_box = _box_class(fp, header, parent)
@@ -566,7 +565,6 @@ class MereBox(Mp4FullBox):
             self.box_info['metabox_relation'] = read_u8(fp)
         finally:
             fp.seek(self.start_of_box + self.size)
-
 
 
 class TrunBox(Mp4FullBox):
