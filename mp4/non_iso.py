@@ -15,8 +15,7 @@ from mp4.core import *
 
 def box_factory_non_iso(fp, header, parent):
     the_box = None
-    box_type = header.type
-    box_type.replace(' ', '_')
+    box_type = header.type.replace(' ', '_')
     if box_type == 'AC-3' or box_type == 'EC-3':
         box_type = box_type.lower()
     _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table

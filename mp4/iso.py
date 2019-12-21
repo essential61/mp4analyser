@@ -31,8 +31,7 @@ def box_factory(fp, header, parent):
     an instance of that class.
     """
     the_box = None
-    box_type = header.type
-    box_type.replace(' ', '_')
+    box_type = header.type.replace(" ", "_")
     _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table
     if _box_class:
         the_box = _box_class(fp, header, parent)
