@@ -8,9 +8,12 @@ A box_factory function has also been defined, primarily to minimise coupling bet
 """
 import binascii
 import datetime
+import logging
+
 import mp4.non_iso
 from mp4.core import *
 from mp4.util import *
+
 
 # Supported box
 # 'ftyp', 'pdin', 'moov', 'mvhd', 'meta', 'trak', 'tkhd', 'tref', 'trgr', 'edts', 'elst', 'mdia',
@@ -32,7 +35,8 @@ def box_factory(fp, header, parent):
     """
     the_box = None
     box_type = header.type.replace(" ", "_")
-    _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table
+    _box_class = globals().get(
+        box_type.capitalize() + 'Box')  # globals() Return a dictionary representing the current global symbol table
     if _box_class:
         the_box = _box_class(fp, header, parent)
         return the_box
@@ -62,6 +66,22 @@ class Mp4File:
                 else:
                     f.seek(-4, 1)
         f.close()
+        # Check there is at least one mdat and a moov that contains traks
+        mdats = sorted([box for box in self.child_boxes if box.type == 'mdat'], key=lambda k: k.size, reverse=True)
+        traks = [tbox for tbox in [box for box in self.child_boxes
+                 if box.type == 'moov'][0].child_boxes
+                 if tbox.type == 'trak']
+        for trak in traks:
+            trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
+            timescale = [box for box in [box for box in trak.child_boxes
+                         if box.type == 'mdia'][0].child_boxes
+                         if box.type == 'mdhd'][0].box_info['timescale']
+            samplebox = [box for box in [box for box in [box for box in trak.child_boxes
+                         if box.type == 'mdia'][0].child_boxes
+                         if box.type == 'minf'][0].child_boxes
+                         if box.type == 'stbl'][0]
+            logging.debug(trak_id)
+            logging.debug(timescale)
 
 
 class FreeBox(Mp4Box):
@@ -83,10 +103,10 @@ class FtypBox(Mp4Box):
         super().__init__(fp, header, parent)
         try:
             self.box_info = {
-                            'major_brand': fp.read(4).decode('utf-8'),
-                            'minor_version': "{0:#010x}".format(read_u32(fp)),
-                            'compatible_brands': []
-                            }
+                'major_brand': fp.read(4).decode('utf-8'),
+                'minor_version': "{0:#010x}".format(read_u32(fp)),
+                'compatible_brands': []
+            }
             bytes_left = self.size - (self.header.header_size + 8)
             while bytes_left > 0:
                 self.box_info['compatible_brands'].append(fp.read(4).decode('utf-8'))
@@ -889,9 +909,9 @@ class StshBox(Mp4FullBox):
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
                 self.box_info['entry_list'].append({
-                                                    'shadowed_sample_number': read_u32(fp),
-                                                    'sync_sample_number': read_u32(fp)
-                                                    })
+                    'shadowed_sample_number': read_u32(fp),
+                    'sync_sample_number': read_u32(fp)
+                })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -974,16 +994,16 @@ class SubsBox(Mp4FullBox):
                         discardable = read_u8(fp)
                         codec_specific_parameters = read_u32(fp)
                         subsample_list.append({
-                                                'subsample_size': subsample_size,
-                                                'subsample_priority': subsample_priority,
-                                                'discardable': discardable,
-                                                'codec_specific_parameters': codec_specific_parameters
-                                              })
+                            'subsample_size': subsample_size,
+                            'subsample_priority': subsample_priority,
+                            'discardable': discardable,
+                            'codec_specific_parameters': codec_specific_parameters
+                        })
                     self.box_info['entry_list'].append({
-                                                        'sample_delta': sample_delta,
-                                                        'subsample_count': subsample_count,
-                                                        'subsample_list': subsample_list
-                                                      })
+                        'sample_delta': sample_delta,
+                        'subsample_count': subsample_count,
+                        'subsample_list': subsample_list
+                    })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1000,9 +1020,9 @@ class SbgpBox(Mp4FullBox):
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
                 self.box_info['entry_list'].append({
-                                                    'sample_count': read_u32(fp),
-                                                    'group_description_index': read_u32(fp)
-                                                  })
+                    'sample_count': read_u32(fp),
+                    'group_description_index': read_u32(fp)
+                })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1141,11 +1161,11 @@ class SdtpBox(Mp4FullBox):
             is_depended_on = the_byte >> 2 & 3
             has_redundancy = the_byte & 3
             self.box_info['sample_list'].append({
-                                                'is_leading': is_leading,
-                                                'sample_depends_on': depends_on,
-                                                'sample_is_depended_on': is_depended_on,
-                                                'sample_has_redundancy': has_redundancy
-                                                })
+                'is_leading': is_leading,
+                'sample_depends_on': depends_on,
+                'sample_is_depended_on': is_depended_on,
+                'sample_has_redundancy': has_redundancy
+            })
         fp.seek(fp_orig)
 
 
@@ -1170,13 +1190,13 @@ class SidxBox(Mp4FullBox):
                 subsegment_dur = read_u32(fp)
                 st_sz = read_u32(fp)
                 self.box_info['reference_list'].append({
-                                                        'reference_type': rt_sz >> 31,
-                                                        'reference_size': rt_sz % 2147483648,
-                                                        'subsegment_duration': subsegment_dur,
-                                                        'starts_with_sap': st_sz >> 31,
-                                                        'SAP_type': st_sz >> 28 & 7,
-                                                        'SAP_delta_time': st_sz % 268435456
-                                                      })
+                    'reference_type': rt_sz >> 31,
+                    'reference_size': rt_sz % 2147483648,
+                    'subsegment_duration': subsegment_dur,
+                    'starts_with_sap': st_sz >> 31,
+                    'SAP_type': st_sz >> 28 & 7,
+                    'SAP_delta_time': st_sz % 268435456
+                })
         finally:
             fp.seek(self.start_of_box + self.size)
 
