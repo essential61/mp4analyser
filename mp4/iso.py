@@ -1,14 +1,12 @@
 """
 iso.py
 
-This file (if and when complete ;-) ) contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
+This file, if and when complete ;-), contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
 Additionally a class to represent the MP4 file that contains the MP4 boxes has been defined.
 A box_factory function has also been defined, primarily to minimise coupling between modules.
 
 """
-import binascii
 import datetime
-import logging
 
 import mp4.non_iso
 from mp4.core import *
@@ -44,11 +42,64 @@ def box_factory(fp, header, parent):
         return mp4.non_iso.box_factory_non_iso(fp, header, parent)
 
 
-# Box classes
+def _generate_samples_from_moov(moov):
+    """ takes information from the sample tables within a moov to produce an aggregated sample list of all tracks """
+    traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
+    sample_list = []
+    for trak in traks:
+        trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
+        timescale = [box for box in [box for box in trak.child_boxes
+                        if box.type == 'mdia'][0].child_boxes
+                        if box.type == 'mdhd'][0].box_info['timescale']
+        samplebox = [box for box in [box for box in [box for box in trak.child_boxes
+                        if box.type == 'mdia'][0].child_boxes
+                        if box.type == 'minf'][0].child_boxes
+                        if box.type == 'stbl'][0]
+        chunk_offsets = [box for box in samplebox.child_boxes
+                         if box.type == 'stco' or box.type == 'co64'][0].box_info['entry_list']
+        sample_size_box = [box for box in samplebox.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
+        if sample_size_box.box_info['sample_size'] > 0:
+            sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
+                            for i in range(sample_size_box.box_info['sample_count'])]
+        elif sample_size_box.type == 'stz2' and sample_size_box.box_info['field_size'] == 4:
+            # unpack array, this has not been tested
+            sample_sizes = [{'entry_size': x} for y in sample_size_box.box_info['entry_list'] for x in y.values()]
+        else:
+            sample_sizes = sample_size_box.box_info['entry_list']
+        sample_to_chunks = [box for box in samplebox.child_boxes
+                            if box.type == 'stsc'][0].box_info['entry_list']
+        s2c_index = 0
+        next_run = 0
+        sample_idx = 0
+        for i, chunk in enumerate(chunk_offsets, 1):
+            if i >= next_run:
+                samples_per_chunk = sample_to_chunks[s2c_index]['samples_per_chunk']
+                s2c_index += 1
+                next_run = sample_to_chunks[s2c_index]['first_chunk'] \
+                    if s2c_index < len(sample_to_chunks) else len(chunk_offsets) + 1
+            chunk_dict = {'track_ID': trak_id,
+                          'chunk_ID': i,
+                          'chunk_offset': chunk['chunk_offset'],
+                          'samples_per_chunk': samples_per_chunk,
+                          'chunk_samples': []
+                          }
+            sample_offset = chunk['chunk_offset']
+            for j, sample in enumerate(sample_sizes[sample_idx:sample_idx + samples_per_chunk], sample_idx + 1):
+                chunk_dict['chunk_samples'].append({
+                                                    'sample_ID': j,
+                                                    'size': sample['entry_size'],
+                                                    'offset': sample_offset
+                                                   })
+                sample_offset += sample['entry_size']
+            sample_list.append(chunk_dict)
+            sample_idx += samples_per_chunk
+    # sort by chunk offset to get interleaved list
+    sample_list.sort(key=lambda k: k['chunk_offset'])
+    return sample_list
 
 
 class Mp4File:
-
+    """ Mp4File Class, effectively the top-level container """
     def __init__(self, filename):
         self.filename = filename
         self.type = 'file'
@@ -66,22 +117,30 @@ class Mp4File:
                 else:
                     f.seek(-4, 1)
         f.close()
-        # Check there is at least one mdat and a moov that contains traks
-        mdats = sorted([box for box in self.child_boxes if box.type == 'mdat'], key=lambda k: k.size, reverse=True)
-        traks = [tbox for tbox in [box for box in self.child_boxes
-                 if box.type == 'moov'][0].child_boxes
-                 if tbox.type == 'trak']
-        for trak in traks:
-            trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
-            timescale = [box for box in [box for box in trak.child_boxes
-                         if box.type == 'mdia'][0].child_boxes
-                         if box.type == 'mdhd'][0].box_info['timescale']
-            samplebox = [box for box in [box for box in [box for box in trak.child_boxes
-                         if box.type == 'mdia'][0].child_boxes
-                         if box.type == 'minf'][0].child_boxes
-                         if box.type == 'stbl'][0]
-            logging.debug(trak_id)
-            logging.debug(timescale)
+        # find any mdat boxes
+        mdats = sorted([mbox for mbox in self.child_boxes if mbox.type == 'mdat'], key=lambda k: k.size, reverse=True)
+        # generate a sample list if there is a moov that contains traks
+        moov = [box for box in self.child_boxes if box.type == 'moov']
+        if moov:
+            sample_list = _generate_samples_from_moov(moov[0])
+            # It's reasonable to assume samples will be located within largest mdat in the the file, but to be sure.
+            min_chunk_offset = sample_list[0]['chunk_offset']
+            max_chunk_offset = sample_list[-1]['chunk_offset']
+            for mdat in mdats:
+                if mdat.start_of_box < min_chunk_offset and (mdat.start_of_box + mdat.size) > max_chunk_offset:
+                    mdat.box_info = sample_list
+                    break
+        # TODO moof/mdat pairs
+
+    def read_bytes(self, offset, num_bytes):
+        with open(self.filename, 'rb') as f:
+            f.seek(offset)
+            bytes_read = f.read(num_bytes)
+        f.close()
+        return bytes_read
+
+
+# Box classes
 
 
 class FreeBox(Mp4Box):
@@ -149,6 +208,7 @@ class ContainerBox(Mp4Box):
 # All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
+IlstBox = ContainerBox
 
 
 class MetaBox(Mp4FullBox):
@@ -404,7 +464,7 @@ class CprtBox(Mp4FullBox):
             else:
                 ch1 = str(chr(60 + (lang >> 10 & 31)))
                 ch2 = str(chr(60 + (lang >> 5 & 31)))
-                ch3 = str(chr(60 + (lang % 32)))
+                ch3 = str(chr(60 + (lang & 31)))
                 self.box_info['language'] = ch1 + ch2 + ch3
             bytes_left = self.size - (self.header.header_size + 2)
             self.box_info['name'] = fp.read(bytes_left).decode('utf-8', errors="ignore")
@@ -1109,16 +1169,15 @@ class Stz2Box(Mp4FullBox):
         try:
             self.box_info['field_size'] = read_u32(fp)
             self.box_info['sample_count'] = read_u32(fp)
-            if self.box_info['sample_size'] == 0:
-                self.box_info['entry_list'] = []
-                for i in range(self.box_info['sample_count']):
-                    if self.box_info['field_size'] == 4:
-                        mybyte = read_u8(fp)
-                        self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
-                    if self.box_info['field_size'] == 8:
-                        self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
-                    if self.box_info['field_size'] == 16:
-                        self.box_info['entry_list'].append({'entry_size': read_u16(fp)})
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['sample_count']):
+                if self.box_info['field_size'] == 4:
+                    mybyte = read_u8(fp)
+                    self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
+                if self.box_info['field_size'] == 8:
+                    self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
+                if self.box_info['field_size'] == 16:
+                    self.box_info['entry_list'].append({'entry_size': read_u16(fp)})
         finally:
             fp.seek(self.start_of_box + self.size)
 

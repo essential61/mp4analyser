@@ -169,6 +169,15 @@ class MyApp(Tk):
         # Now fill tree with new contents
         for l0, this_box in enumerate(self.mp4file.child_boxes):
             self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
+            if this_box.type == 'mdat' and type(this_box.box_info) is list:
+                self.tree.item(str(l0), open=FALSE)
+                for chunk_idx, chunk in enumerate(this_box.box_info):
+                    item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
+                    self.tree.insert(str(l0), 'end', "chunk_{0}".format(chunk_idx), text=item_text)
+                    for sample_idx, sample in enumerate(chunk['chunk_samples']):
+                        item_text = "sample {0}".format(sample['sample_ID'])
+                        self.tree.insert( "chunk_{0}".format(chunk_idx), 'end',
+                                          "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
             for l1, this_box in enumerate(this_box.child_boxes):
                 l1_iid = "{0}.{1}".format(l0, l1)
                 self.tree.insert(str(l0), 'end', l1_iid, text=l1_iid + " " + this_box.type, open=TRUE)
@@ -201,35 +210,57 @@ class MyApp(Tk):
         logging.debug("Box selected " + self.tree.focus())
         self.statustext.set("Loading...")
         self.update_idletasks()
-        # self.tree.focus() returns id in the form  n.n.n as text
-        l = [int(i) for i in self.tree.focus().split('.')]
-        box_selected = None
-        if len(l) == 1:
-            box_selected = self.mp4file.child_boxes[l[0]]
-        elif len(l) == 2:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]]
-        elif len(l) == 3:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]]
-        elif len(l) == 4:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[l[3]]
-        elif len(l) == 5:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                l[3]].child_boxes[l[4]]
-        elif len(l) == 6:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                l[3]].child_boxes[l[4]].child_boxes[l[5]]
-        elif len(l) == 7:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]]
-        elif len(l) == 8:
-            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
-        logging.debug("Populating text widgets")
-        self.populate_text_widget(box_selected)
-        logging.debug("Upper text widget populated")
-        self.populate_hex_text_widget(box_selected)
-        logging.debug("Hex text widget populated")
-        self.statustext.set("")
+        if self.tree.focus()[0:5] == 'chunk':
+            item_id = self.tree.focus()
+            idx_chunk = int(item_id.split('_')[1])
+            idx_mdat = int(self.tree.parent(item_id))
+            chunk_dict = self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]
+            self.populate_text_widget_json_dictionary(chunk_dict)
+            byte_offset = chunk_dict['chunk_offset']
+            last_sample = chunk_dict['chunk_samples'][-1]
+            num_bytes = (last_sample['offset'] + last_sample['size']) - byte_offset
+            self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
+        elif self.tree.focus()[0:6] == 'sample':
+            item_id = self.tree.focus()
+            idx_sample = int(item_id.split('.')[1])
+            parent_id = self.tree.parent(item_id)
+            idx_chunk = int(parent_id.split('_')[1])
+            idx_mdat = int(self.tree.parent(parent_id))
+            sample_dict = self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]['chunk_samples'][idx_sample]
+            self.populate_text_widget_json_dictionary(sample_dict)
+            byte_offset = sample_dict['offset']
+            num_bytes = sample_dict['size']
+            self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
+        else:
+            # self.tree.focus() returns id in the form  n.n.n as text
+            l = [int(i) for i in self.tree.focus().split('.')]
+            box_selected = None
+            if len(l) == 1:
+                box_selected = self.mp4file.child_boxes[l[0]]
+            elif len(l) == 2:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]]
+            elif len(l) == 3:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]]
+            elif len(l) == 4:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[l[3]]
+            elif len(l) == 5:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                    l[3]].child_boxes[l[4]]
+            elif len(l) == 6:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                    l[3]].child_boxes[l[4]].child_boxes[l[5]]
+            elif len(l) == 7:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                    l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]]
+            elif len(l) == 8:
+                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                    l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
+            logging.debug("Populating text widgets")
+            self.populate_text_widget(box_selected)
+            logging.debug("Upper text widget populated")
+            self.populate_hex_text_widget(box_selected.get_bytes())
+            logging.debug("Hex text widget populated")
+            self.statustext.set("")
 
     def populate_text_widget(self, box_selected):
         self.t.delete(1.0, END)
@@ -238,23 +269,34 @@ class MyApp(Tk):
         my_string += "Has header:\n" + json.dumps(box_selected.header.get_header()) + "\n\n"
         if len(box_selected.box_info) > 0:
             # insertion order is preserved in modern Python
-            my_string += "Has values:\n" + json.dumps(box_selected.box_info, indent=4) + "\n\n"
+            if box_selected.type == 'mdat' and type(box_selected.box_info) is list:
+                # truncate mdat chunk/sample data so json.dumps is fast
+                my_string += "Showing first 100 chunks within mdat:\n" \
+                             + json.dumps(box_selected.box_info[:100], indent=2) + "\n\n"
+            else:
+                my_string += "Has values:\n" + json.dumps(box_selected.box_info, indent=2) + "\n\n"
         if len(box_selected.child_boxes) > 0:
             my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.child_boxes])
+        logging.debug("JSON string prepared")
         self.t.insert(END, my_string)
 
-    def populate_hex_text_widget(self, box_selected):
+    def populate_text_widget_json_dictionary(self, the_dictionary):
+        self.t.delete(1.0, END)
+        self.t.insert(END, json.dumps(the_dictionary, indent=2))
+
+    def populate_hex_text_widget(self, my_byte_list):
         bytes_per_line = 32  # Num bytes per line
-        trunc_size = 1000000  # Arbitrary max number of bytes to display in hex view to prevent tk text widget barfing.
+        # trunc_size = arbitrary max. number of bytes to display in hex view to prevent tk text widget barfing.
+        # change to suit
+        trunc_size = 1000000
         self.thex.delete(1.0, END)
-        my_byte_string = box_selected.get_bytes()
         trunc = False
-        if len(my_byte_string) > trunc_size:
-            my_byte_string = my_byte_string[:trunc_size]
+        if len(my_byte_list) > trunc_size:
+            my_byte_list = my_byte_list[:trunc_size]
             trunc = True
         hex_string = ''
-        for i in range(0, len(my_byte_string), bytes_per_line):
-            byte_line = my_byte_string[i:i + bytes_per_line]
+        for i in range(0, len(my_byte_list), bytes_per_line):
+            byte_line = my_byte_list[i:i + bytes_per_line]
             # which is better 256 or 65536? Maybe 65536 for east asian subs
             char_line = "".join([k if k.isprintable() and ord(k) < 65536 else '.'
                                  for k in byte_line.decode('utf-8', "replace")])

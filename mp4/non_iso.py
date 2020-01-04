@@ -18,7 +18,8 @@ def box_factory_non_iso(fp, header, parent):
     box_type = header.type.replace(' ', '_')
     if box_type == 'AC-3' or box_type == 'EC-3':
         box_type = box_type.lower()
-    _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table
+    # globals() Return a dictionary representing the current global symbol table
+    _box_class = globals().get(box_type.capitalize()+'Box')
     if _box_class:
         the_box = _box_class(fp, header, parent)
     else:
@@ -265,28 +266,6 @@ class Dec3Box(Mp4Box):
                 if num_dep_sub > 0:
                     sub_dict['chan_loc'] = (bit_9 * 512) + read_u8(fp)
                 self.box_info['ind_sub_list'].append(sub_dict)
-        finally:
-            fp.seek(self.start_of_box + self.size)
-
-
-class IlstBox(Mp4Box):
-
-    def __init__(self, fp, header, parent):
-        super().__init__(fp, header, parent)
-        try:
-            self.box_info['offset'] = read_u32(fp)
-            my_4bytes = fp.read(4)
-            # WTF! a non-printing character in the box type.
-            if (struct.unpack('>I', my_4bytes)[0]) >> 24 == 169:
-                self.box_info['box_type'] = my_4bytes[1:].decode('utf-8')
-            else:
-                self.box_info['box_type'] = my_4bytes.decode('utf-8')
-            bytes_left = self.start_of_box + self.size - fp.tell()
-            while bytes_left > 7:
-                current_header = Header(fp)
-                current_box = mp4.iso.box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
-                bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
 

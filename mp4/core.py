@@ -2,6 +2,7 @@
 core.py contains class definitions used by both iso.py and non_iso.py, namely classes (Mp4Box and Mp4FullBox)
 that are used as parents for all the real, instantiated boxes. Also contains a header class definition.
 """
+import binascii
 from mp4.util import *
 
 
@@ -68,11 +69,16 @@ class Header:
         """
         start_of_box = fp.tell()
         self._size = read_u32(fp)
-        self.type = fp.read(4).decode('utf-8', errors="ignore")
+        #self.type = fp.read(4).decode('utf-8', errors="ignore")
+        my_4bytes = fp.read(4)
+        if (struct.unpack('>I', my_4bytes)[0]) >> 24 == 169:
+            self.type = my_4bytes[1:].decode('utf-8')
+        else:
+            self.type = my_4bytes.decode('utf-8')
         if self._size == 1:
             self._largesize = read_u64(fp)
         if self.type == 'uuid':
-            self.uuid = fp.read(16)
+            self.uuid = binascii.b2a_hex(fp.read(16)).decode('utf-8', errors="ignore")
         self.header_size = fp.tell() - start_of_box
         # throw error if size < 8 as 8 bytes is smallest box (free, skip etc)
         if self.size < 8:
