@@ -247,7 +247,7 @@ class MyApp(Tk):
                                 self.tree.insert("chunk_{0}".format(chunk_idx), 'end',
                                              "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
                         else: # fragmented mp4 uses term "run" but is otherwise same
-                            item_text = "track {0}, seq. {1}, run {2}".format(chunk['track_ID'],
+                            item_text = "track {0}, seq {1}, run {2}".format(chunk['track_ID'],
                                                                               chunk['sequence_number'],
                                                                               chunk['run_ID'])
                             self.tree.insert(str(l[0]),
