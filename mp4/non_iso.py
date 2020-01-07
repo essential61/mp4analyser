@@ -73,7 +73,7 @@ class Avc1Box(Mp4FullBox):
 Hvc1Box = Avc1Box
 
 
-class AvcCBox(Mp4Box):
+class AvccBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
@@ -120,7 +120,7 @@ class AvcCBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-class HvcCBox(Mp4Box):
+class HvccBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)

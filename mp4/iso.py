@@ -42,62 +42,6 @@ def box_factory(fp, header, parent):
         return mp4.non_iso.box_factory_non_iso(fp, header, parent)
 
 
-def _generate_samples_from_moov(moov):
-    """ takes information from the sample tables within a moov to produce an aggregated sample list of all tracks """
-    traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
-    sample_list = []
-    for trak in traks:
-        trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
-        timescale = [box for box in [box for box in trak.child_boxes
-                        if box.type == 'mdia'][0].child_boxes
-                        if box.type == 'mdhd'][0].box_info['timescale']
-        samplebox = [box for box in [box for box in [box for box in trak.child_boxes
-                        if box.type == 'mdia'][0].child_boxes
-                        if box.type == 'minf'][0].child_boxes
-                        if box.type == 'stbl'][0]
-        chunk_offsets = [box for box in samplebox.child_boxes
-                         if box.type == 'stco' or box.type == 'co64'][0].box_info['entry_list']
-        sample_size_box = [box for box in samplebox.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
-        if sample_size_box.box_info['sample_size'] > 0:
-            sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
-                            for i in range(sample_size_box.box_info['sample_count'])]
-        elif sample_size_box.type == 'stz2' and sample_size_box.box_info['field_size'] == 4:
-            # unpack array, this has not been tested
-            sample_sizes = [{'entry_size': x} for y in sample_size_box.box_info['entry_list'] for x in y.values()]
-        else:
-            sample_sizes = sample_size_box.box_info['entry_list']
-        sample_to_chunks = [box for box in samplebox.child_boxes
-                            if box.type == 'stsc'][0].box_info['entry_list']
-        s2c_index = 0
-        next_run = 0
-        sample_idx = 0
-        for i, chunk in enumerate(chunk_offsets, 1):
-            if i >= next_run:
-                samples_per_chunk = sample_to_chunks[s2c_index]['samples_per_chunk']
-                s2c_index += 1
-                next_run = sample_to_chunks[s2c_index]['first_chunk'] \
-                    if s2c_index < len(sample_to_chunks) else len(chunk_offsets) + 1
-            chunk_dict = {'track_ID': trak_id,
-                          'chunk_ID': i,
-                          'chunk_offset': chunk['chunk_offset'],
-                          'samples_per_chunk': samples_per_chunk,
-                          'chunk_samples': []
-                          }
-            sample_offset = chunk['chunk_offset']
-            for j, sample in enumerate(sample_sizes[sample_idx:sample_idx + samples_per_chunk], sample_idx + 1):
-                chunk_dict['chunk_samples'].append({
-                                                    'sample_ID': j,
-                                                    'size': sample['entry_size'],
-                                                    'offset': sample_offset
-                                                   })
-                sample_offset += sample['entry_size']
-            sample_list.append(chunk_dict)
-            sample_idx += samples_per_chunk
-    # sort by chunk offset to get interleaved list
-    sample_list.sort(key=lambda k: k['chunk_offset'])
-    return sample_list
-
-
 class Mp4File:
     """ Mp4File Class, effectively the top-level container """
     def __init__(self, filename):
@@ -117,20 +61,133 @@ class Mp4File:
                 else:
                     f.seek(-4, 1)
         f.close()
-        # find any mdat boxes
+        self._generate_samples_from_moov()
+        # TODO moof/mdats media segments
+        self._generate_samples_in_media_segments()
+
+    def _generate_samples_from_moov(self):
+        """ identify media samples in mdat for full mp4 file """
         mdats = sorted([mbox for mbox in self.child_boxes if mbox.type == 'mdat'], key=lambda k: k.size, reverse=True)
-        # generate a sample list if there is a moov that contains traks
-        moov = [box for box in self.child_boxes if box.type == 'moov']
-        if moov:
-            sample_list = _generate_samples_from_moov(moov[0])
-            # It's reasonable to assume samples will be located within largest mdat in the the file, but to be sure.
-            min_chunk_offset = sample_list[0]['chunk_offset']
-            max_chunk_offset = sample_list[-1]['chunk_offset']
-            for mdat in mdats:
-                if mdat.start_of_box < min_chunk_offset and (mdat.start_of_box + mdat.size) > max_chunk_offset:
-                    mdat.box_info = sample_list
-                    break
-        # TODO moof/mdat pairs
+        # generate a sample list if there is a moov that contains traks N.B only ever 0,1 moov boxes
+        if len([box for box in self.child_boxes if box.type == 'moov']):
+            moov = [box for box in self.child_boxes if box.type == 'moov'][0]
+            traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
+            sample_list = []
+            for trak in traks:
+                trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
+                timescale = [box for box in [box for box in trak.child_boxes
+                                             if box.type == 'mdia'][0].child_boxes
+                             if box.type == 'mdhd'][0].box_info['timescale']
+                samplebox = [box for box in [box for box in [box for box in trak.child_boxes
+                                                             if box.type == 'mdia'][0].child_boxes
+                                             if box.type == 'minf'][0].child_boxes
+                             if box.type == 'stbl'][0]
+                chunk_offsets = [box for box in samplebox.child_boxes
+                                 if box.type == 'stco' or box.type == 'co64'][0].box_info['entry_list']
+                sample_size_box = [box for box in samplebox.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
+                if sample_size_box.box_info['sample_size'] > 0:
+                    sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
+                                    for i in range(sample_size_box.box_info['sample_count'])]
+                elif sample_size_box.type == 'stz2' and sample_size_box.box_info['field_size'] == 4:
+                    # unpack array, this has not been tested
+                    sample_sizes = [{'entry_size': x} for y in sample_size_box.box_info['entry_list'] for x in
+                                    y.values()]
+                else:
+                    sample_sizes = sample_size_box.box_info['entry_list']
+                sample_to_chunks = [box for box in samplebox.child_boxes
+                                    if box.type == 'stsc'][0].box_info['entry_list']
+                s2c_index = 0
+                next_run = 0
+                sample_idx = 0
+                for i, chunk in enumerate(chunk_offsets, 1):
+                    if i >= next_run:
+                        samples_per_chunk = sample_to_chunks[s2c_index]['samples_per_chunk']
+                        s2c_index += 1
+                        next_run = sample_to_chunks[s2c_index]['first_chunk'] \
+                            if s2c_index < len(sample_to_chunks) else len(chunk_offsets) + 1
+                    chunk_dict = {'track_ID': trak_id,
+                                  'chunk_ID': i,
+                                  'chunk_offset': chunk['chunk_offset'],
+                                  'samples_per_chunk': samples_per_chunk,
+                                  'chunk_samples': []
+                                  }
+                    sample_offset = chunk['chunk_offset']
+                    for j, sample in enumerate(sample_sizes[sample_idx:sample_idx + samples_per_chunk], sample_idx + 1):
+                        chunk_dict['chunk_samples'].append({
+                            'sample_ID': j,
+                            'size': sample['entry_size'],
+                            'offset': sample_offset
+                        })
+                        sample_offset += sample['entry_size']
+                    sample_list.append(chunk_dict)
+                    sample_idx += samples_per_chunk
+            # len(sample_list) could be zero, say, for mpeg-dash initialization segment
+            if len(sample_list):
+                # sort by chunk offset to get interleaved list
+                sample_list.sort(key=lambda k: k['chunk_offset'])
+                # It's reasonable to assume samples will be located within largest mdat in the the file, but to be sure.
+                min_chunk_offset = sample_list[0]['chunk_offset']
+                max_chunk_offset = sample_list[-1]['chunk_offset']
+                for mdat in mdats:
+                    if mdat.start_of_box < min_chunk_offset and (mdat.start_of_box + mdat.size) > max_chunk_offset:
+                        mdat.box_info = sample_list
+                        break
+
+    def _generate_samples_in_media_segments(self):
+        """
+        generate samples within mdats of media segments for fragmented mp4 files
+        media segments are 1 moof (optionally preceded by an styp) followed by 1 or more contiguous mdats
+        I've only ever seen 1 mdat in a media segment though
+        """
+        i = 0
+        while i < len(self.child_boxes) - 1:
+            if self.child_boxes[i].type == 'moof':
+                moof = self.child_boxes[i]
+                media_segment = {'moof_box': moof, 'mdat_boxes': []}
+                sequence_number = [mfhd for mfhd in moof.child_boxes
+                                   if mfhd.type == 'mfhd'][0].box_info['sequence_number']
+                while i < len(self.child_boxes) - 1 and self.child_boxes[i + 1].type == 'mdat':
+                    media_segment['mdat_boxes'].append(self.child_boxes[i + 1])
+                    i += 1
+                # I've only ever seen 1 traf in a moof, but the standard says there could be more
+                data_offset = 0
+                for j,traf in enumerate([tbox for tbox in moof.child_boxes if tbox.type == 'traf']):
+                    # read tfhd, there will be one
+                    tfhd = [hbox for hbox in traf.child_boxes if hbox.type == 'tfhd'][0]
+                    trak_id = tfhd.box_info['track_id']
+                    if 'base_data_offset' in tfhd.box_info:
+                        data_offset = tfhd.box_info['base_data_offset']
+                    elif tfhd.box_info['default_base_is_moof']:
+                        data_offset = media_segment['moof_box'].start_of_box
+                    elif j > 0:
+                        # according to spec. should be set end of data for last fragment
+                        pass
+                    else:
+                        base_data_offset = media_segment['moof_box'].start_of_box
+                    for k, trun in enumerate([rbox for rbox in traf.child_boxes if rbox.type == 'trun'], 1):
+                        if 'data_offset' in trun.box_info:
+                            data_offset += trun.box_info['data_offset']
+                        run_dict = {'sequence_number': sequence_number,
+                                    'track_ID': trak_id,
+                                    'run_ID': k,
+                                    'run_offset': data_offset,
+                                    'sample_count': trun.box_info['sample_count'],
+                                    'run_samples': []
+                                    }
+                        for l, sample in enumerate(trun.box_info['samples'], 1):
+                            run_dict['run_samples'].append({'sample_ID': l,
+                                                            'size': sample['sample_size'],
+                                                            'offset': data_offset
+                                                            })
+                            data_offset += sample['sample_size']
+                        for mdat in media_segment['mdat_boxes']:
+                            if mdat.start_of_box < run_dict['run_offset'] and (mdat.start_of_box
+                                                                               + mdat.size) >= data_offset:
+                                if type(mdat.box_info) is list:
+                                    mdat.box_info.append(run_dict)
+                                else:
+                                    mdat.box_info = [run_dict]
+            i += 1
 
     def read_bytes(self, offset, num_bytes):
         with open(self.filename, 'rb') as f:
@@ -351,12 +408,20 @@ class TfhdBox(Mp4FullBox):
                 self.box_info['base_data_offset'] = read_u64(fp)
             if int(self.box_info['flags'][-1]) & 2 == 2:
                 self.box_info['sample_description_index'] = read_u32(fp)
-            if int(self.box_info['flags'][-2]) & 1 == 1:
+            if int(self.box_info['flags'][-1]) & 8 == 8:
                 self.box_info['default_sample_duration'] = read_u32(fp)
-            if int(self.box_info['flags'][-2]) & 2 == 2:
+            if int(self.box_info['flags'][-2]) & 1 == 1:
                 self.box_info['default_sample_size'] = read_u32(fp)
-            if int(self.box_info['flags'][-5]) & 2 == 2:
+            if int(self.box_info['flags'][-2]) & 2 == 2:
                 self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
+            if int(self.box_info['flags'][-5]) & 1 == 1:
+                self.box_info['duration_is_empty'] = True
+            else:
+                self.box_info['duration_is_empty'] = False
+            if int(self.box_info['flags'][-5]) & 2 == 2:
+                self.box_info['default_base_is_moof'] = True
+            else:
+                self.box_info['default_base_is_moof'] = False
         finally:
             fp.seek(self.start_of_box + self.size)
 

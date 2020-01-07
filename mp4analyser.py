@@ -151,7 +151,7 @@ class MyApp(Tk):
 
     def open_file(self):
         """ Callback on selecting 'Open' from menu """
-        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4a .m4p .m4b .m4r .m4v"),
+        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4*"),
                                                          ("All Files", "*.*")), initialdir=self.dialog_dir)
         if filename == ():
             return
@@ -161,7 +161,7 @@ class MyApp(Tk):
         self.mp4file = mp4.iso.Mp4File(filename)
         logging.debug("Finished loading file " + filename)
         self.dialog_dir, filename_base = os.path.split(filename)
-        self.title("MP4 Analyser" + " - " + filename_base)
+        self.title("MP4 Analyser - {0:s}".format(filename_base))
         # Clear tree and text widgets if not empty
         self.tree.delete(*self.tree.get_children())
         self.t.delete(1.0, END)
@@ -169,15 +169,6 @@ class MyApp(Tk):
         # Now fill tree with new contents
         for l0, this_box in enumerate(self.mp4file.child_boxes):
             self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
-            if this_box.type == 'mdat' and type(this_box.box_info) is list:
-                self.tree.item(str(l0), open=FALSE)
-                for chunk_idx, chunk in enumerate(this_box.box_info):
-                    item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
-                    self.tree.insert(str(l0), 'end', "chunk_{0}".format(chunk_idx), text=item_text)
-                    for sample_idx, sample in enumerate(chunk['chunk_samples']):
-                        item_text = "sample {0}".format(sample['sample_ID'])
-                        self.tree.insert( "chunk_{0}".format(chunk_idx), 'end',
-                                          "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
             for l1, this_box in enumerate(this_box.child_boxes):
                 l1_iid = "{0}.{1}".format(l0, l1)
                 self.tree.insert(str(l0), 'end', l1_iid, text=l1_iid + " " + this_box.type, open=TRUE)
@@ -204,6 +195,7 @@ class MyApp(Tk):
                                                          open=TRUE)
         logging.debug("Finished populating " + filename)
         self.statustext.set("")
+        self.update_idletasks()
 
     def select_box(self, a):
         """ Callback on selecting an Mp4 box in treeview """
@@ -216,8 +208,12 @@ class MyApp(Tk):
             idx_mdat = int(self.tree.parent(item_id))
             chunk_dict = self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]
             self.populate_text_widget_json_dictionary(chunk_dict)
-            byte_offset = chunk_dict['chunk_offset']
-            last_sample = chunk_dict['chunk_samples'][-1]
+            if 'chunk_offset' in chunk_dict:
+                byte_offset = chunk_dict['chunk_offset']
+                last_sample = chunk_dict['chunk_samples'][-1]
+            else:
+                byte_offset = chunk_dict['run_offset']
+                last_sample = chunk_dict['run_samples'][-1]
             num_bytes = (last_sample['offset'] + last_sample['size']) - byte_offset
             self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
         elif self.tree.focus()[0:6] == 'sample':
@@ -226,7 +222,10 @@ class MyApp(Tk):
             parent_id = self.tree.parent(item_id)
             idx_chunk = int(parent_id.split('_')[1])
             idx_mdat = int(self.tree.parent(parent_id))
-            sample_dict = self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]['chunk_samples'][idx_sample]
+            if 'chunk_samples' in self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]:
+                sample_dict = self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]['chunk_samples'][idx_sample]
+            else:
+                sample_dict = self.mp4file.child_boxes[idx_mdat].box_info[idx_chunk]['run_samples'][idx_sample]
             self.populate_text_widget_json_dictionary(sample_dict)
             byte_offset = sample_dict['offset']
             num_bytes = sample_dict['size']
@@ -237,6 +236,32 @@ class MyApp(Tk):
             box_selected = None
             if len(l) == 1:
                 box_selected = self.mp4file.child_boxes[l[0]]
+                if box_selected.type == 'mdat' and type(box_selected.box_info) is list \
+                        and len(self.tree.get_children(self.tree.focus())) == 0:
+                    for chunk_idx, chunk in enumerate(box_selected.box_info):
+                        if 'chunk_ID' in chunk:
+                            item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
+                            self.tree.insert(str(l[0]), 'end', "chunk_{0}".format(chunk_idx), text=item_text)
+                            for sample_idx, sample in enumerate(chunk['chunk_samples']):
+                                item_text = "sample {0}".format(sample['sample_ID'])
+                                self.tree.insert("chunk_{0}".format(chunk_idx), 'end',
+                                             "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
+                        else: # fragmented mp4 uses term "run" but is otherwise same
+                            item_text = "track {0}, seq. {1}, run {2}".format(chunk['track_ID'],
+                                                                              chunk['sequence_number'],
+                                                                              chunk['run_ID'])
+                            self.tree.insert(str(l[0]),
+                                             'end',
+                                             "chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx ),
+                                             text=item_text)
+                            for sample_idx, sample in enumerate(chunk['run_samples']):
+                                item_text = "sample {0}".format(sample['sample_ID'])
+                                self.tree.insert("chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
+                                                 'end',
+                                                 "sample-{0}_{1}.{2}".format(chunk['sequence_number'],
+                                                                             chunk_idx,
+                                                                             sample_idx),
+                                                 text=item_text)
             elif len(l) == 2:
                 box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]]
             elif len(l) == 3:
@@ -264,17 +289,16 @@ class MyApp(Tk):
 
     def populate_text_widget(self, box_selected):
         self.t.delete(1.0, END)
-        my_string = "Box is located at position " + "{0:#d}".format(box_selected.start_of_box) + \
-                    " from start of from file\n\n"
-        my_string += "Has header:\n" + json.dumps(box_selected.header.get_header()) + "\n\n"
+        my_string = "Box is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.start_of_box)
+        my_string += "Has header:\n{0:s}\n\n".format(json.dumps(box_selected.header.get_header()))
         if len(box_selected.box_info) > 0:
             # insertion order is preserved in modern Python
             if box_selected.type == 'mdat' and type(box_selected.box_info) is list:
                 # truncate mdat chunk/sample data so json.dumps is fast
-                my_string += "Showing first 100 chunks within mdat:\n" \
-                             + json.dumps(box_selected.box_info[:100], indent=2) + "\n\n"
+                my_string += "Showing first 100 chunks within mdat:\n{0:s}\n\n".format(
+                    json.dumps(box_selected.box_info[:100], indent=2))
             else:
-                my_string += "Has values:\n" + json.dumps(box_selected.box_info, indent=2) + "\n\n"
+                my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.box_info, indent=2))
         if len(box_selected.child_boxes) > 0:
             my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.child_boxes])
         logging.debug("JSON string prepared")
@@ -306,9 +330,9 @@ class MyApp(Tk):
             hex_string += pretty_hex_line + '\t' + char_line + '\n'
         logging.debug("Hex text processed")
         if trunc:
-            self.thex.insert(END, 'Hex view, showing first 1MB: \n' + hex_string)
+            self.thex.insert(END, 'Hex view, showing first {0:d} bytes: \n{1:s}'.format(trunc_size, hex_string))
         else:
-            self.thex.insert(END, 'Hex view: \n' + hex_string)
+            self.thex.insert(END, 'Hex view: \n{0:s}'.format(hex_string))
 
 
 if __name__ == '__main__':
