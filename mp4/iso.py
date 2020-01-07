@@ -1,16 +1,17 @@
 """
 iso.py
 
-This file (if and when complete ;-) ) contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
+This file, if and when complete ;-), contains all the class definitions of boxes that are specified in ISO/IEC 14496-12.
 Additionally a class to represent the MP4 file that contains the MP4 boxes has been defined.
 A box_factory function has also been defined, primarily to minimise coupling between modules.
 
 """
-import binascii
 import datetime
+
 import mp4.non_iso
 from mp4.core import *
 from mp4.util import *
+
 
 # Supported box
 # 'ftyp', 'pdin', 'moov', 'mvhd', 'meta', 'trak', 'tkhd', 'tref', 'trgr', 'edts', 'elst', 'mdia',
@@ -32,7 +33,8 @@ def box_factory(fp, header, parent):
     """
     the_box = None
     box_type = header.type.replace(" ", "_")
-    _box_class = globals().get(box_type.capitalize()+'Box') # globals() Return a dictionary representing the current global symbol table
+    _box_class = globals().get(
+        box_type.capitalize() + 'Box')  # globals() Return a dictionary representing the current global symbol table
     if _box_class:
         the_box = _box_class(fp, header, parent)
         return the_box
@@ -40,11 +42,8 @@ def box_factory(fp, header, parent):
         return mp4.non_iso.box_factory_non_iso(fp, header, parent)
 
 
-# Box classes
-
-
 class Mp4File:
-
+    """ Mp4File Class, effectively the top-level container """
     def __init__(self, filename):
         self.filename = filename
         self.type = 'file'
@@ -62,6 +61,143 @@ class Mp4File:
                 else:
                     f.seek(-4, 1)
         f.close()
+        self._generate_samples_from_moov()
+        # TODO moof/mdats media segments
+        self._generate_samples_in_media_segments()
+
+    def _generate_samples_from_moov(self):
+        """ identify media samples in mdat for full mp4 file """
+        mdats = sorted([mbox for mbox in self.child_boxes if mbox.type == 'mdat'], key=lambda k: k.size, reverse=True)
+        # generate a sample list if there is a moov that contains traks N.B only ever 0,1 moov boxes
+        if len([box for box in self.child_boxes if box.type == 'moov']):
+            moov = [box for box in self.child_boxes if box.type == 'moov'][0]
+            traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
+            sample_list = []
+            for trak in traks:
+                trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
+                timescale = [box for box in [box for box in trak.child_boxes
+                                             if box.type == 'mdia'][0].child_boxes
+                             if box.type == 'mdhd'][0].box_info['timescale']
+                samplebox = [box for box in [box for box in [box for box in trak.child_boxes
+                                                             if box.type == 'mdia'][0].child_boxes
+                                             if box.type == 'minf'][0].child_boxes
+                             if box.type == 'stbl'][0]
+                chunk_offsets = [box for box in samplebox.child_boxes
+                                 if box.type == 'stco' or box.type == 'co64'][0].box_info['entry_list']
+                sample_size_box = [box for box in samplebox.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
+                if sample_size_box.box_info['sample_size'] > 0:
+                    sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
+                                    for i in range(sample_size_box.box_info['sample_count'])]
+                elif sample_size_box.type == 'stz2' and sample_size_box.box_info['field_size'] == 4:
+                    # unpack array, this has not been tested
+                    sample_sizes = [{'entry_size': x} for y in sample_size_box.box_info['entry_list'] for x in
+                                    y.values()]
+                else:
+                    sample_sizes = sample_size_box.box_info['entry_list']
+                sample_to_chunks = [box for box in samplebox.child_boxes
+                                    if box.type == 'stsc'][0].box_info['entry_list']
+                s2c_index = 0
+                next_run = 0
+                sample_idx = 0
+                for i, chunk in enumerate(chunk_offsets, 1):
+                    if i >= next_run:
+                        samples_per_chunk = sample_to_chunks[s2c_index]['samples_per_chunk']
+                        s2c_index += 1
+                        next_run = sample_to_chunks[s2c_index]['first_chunk'] \
+                            if s2c_index < len(sample_to_chunks) else len(chunk_offsets) + 1
+                    chunk_dict = {'track_ID': trak_id,
+                                  'chunk_ID': i,
+                                  'chunk_offset': chunk['chunk_offset'],
+                                  'samples_per_chunk': samples_per_chunk,
+                                  'chunk_samples': []
+                                  }
+                    sample_offset = chunk['chunk_offset']
+                    for j, sample in enumerate(sample_sizes[sample_idx:sample_idx + samples_per_chunk], sample_idx + 1):
+                        chunk_dict['chunk_samples'].append({
+                            'sample_ID': j,
+                            'size': sample['entry_size'],
+                            'offset': sample_offset
+                        })
+                        sample_offset += sample['entry_size']
+                    sample_list.append(chunk_dict)
+                    sample_idx += samples_per_chunk
+            # len(sample_list) could be zero, say, for mpeg-dash initialization segment
+            if len(sample_list):
+                # sort by chunk offset to get interleaved list
+                sample_list.sort(key=lambda k: k['chunk_offset'])
+                # It's reasonable to assume samples will be located within largest mdat in the the file, but to be sure.
+                min_chunk_offset = sample_list[0]['chunk_offset']
+                max_chunk_offset = sample_list[-1]['chunk_offset']
+                for mdat in mdats:
+                    if mdat.start_of_box < min_chunk_offset and (mdat.start_of_box + mdat.size) > max_chunk_offset:
+                        mdat.box_info = sample_list
+                        break
+
+    def _generate_samples_in_media_segments(self):
+        """
+        generate samples within mdats of media segments for fragmented mp4 files
+        media segments are 1 moof (optionally preceded by an styp) followed by 1 or more contiguous mdats
+        I've only ever seen 1 mdat in a media segment though
+        """
+        i = 0
+        while i < len(self.child_boxes) - 1:
+            if self.child_boxes[i].type == 'moof':
+                moof = self.child_boxes[i]
+                media_segment = {'moof_box': moof, 'mdat_boxes': []}
+                sequence_number = [mfhd for mfhd in moof.child_boxes
+                                   if mfhd.type == 'mfhd'][0].box_info['sequence_number']
+                while i < len(self.child_boxes) - 1 and self.child_boxes[i + 1].type == 'mdat':
+                    media_segment['mdat_boxes'].append(self.child_boxes[i + 1])
+                    i += 1
+                # I've only ever seen 1 traf in a moof, but the standard says there could be more
+                data_offset = 0
+                for j,traf in enumerate([tbox for tbox in moof.child_boxes if tbox.type == 'traf']):
+                    # read tfhd, there will be one
+                    tfhd = [hbox for hbox in traf.child_boxes if hbox.type == 'tfhd'][0]
+                    trak_id = tfhd.box_info['track_id']
+                    if 'base_data_offset' in tfhd.box_info:
+                        data_offset = tfhd.box_info['base_data_offset']
+                    elif tfhd.box_info['default_base_is_moof']:
+                        data_offset = media_segment['moof_box'].start_of_box
+                    elif j > 0:
+                        # according to spec. should be set end of data for last fragment
+                        pass
+                    else:
+                        base_data_offset = media_segment['moof_box'].start_of_box
+                    for k, trun in enumerate([rbox for rbox in traf.child_boxes if rbox.type == 'trun'], 1):
+                        if 'data_offset' in trun.box_info:
+                            data_offset += trun.box_info['data_offset']
+                        run_dict = {'sequence_number': sequence_number,
+                                    'track_ID': trak_id,
+                                    'run_ID': k,
+                                    'run_offset': data_offset,
+                                    'sample_count': trun.box_info['sample_count'],
+                                    'run_samples': []
+                                    }
+                        for l, sample in enumerate(trun.box_info['samples'], 1):
+                            run_dict['run_samples'].append({'sample_ID': l,
+                                                            'size': sample['sample_size'],
+                                                            'offset': data_offset
+                                                            })
+                            data_offset += sample['sample_size']
+                        for mdat in media_segment['mdat_boxes']:
+                            if mdat.start_of_box < run_dict['run_offset'] and (mdat.start_of_box
+                                                                               + mdat.size) >= data_offset:
+                                if type(mdat.box_info) is list:
+                                    mdat.box_info.append(run_dict)
+                                else:
+                                    mdat.box_info = [run_dict]
+            i += 1
+
+    def read_bytes(self, offset, num_bytes):
+        with open(self.filename, 'rb') as f:
+            f.seek(offset)
+            bytes_read = f.read(num_bytes)
+        f.close()
+        return bytes_read
+
+
+# Box classes
 
 
 class FreeBox(Mp4Box):
@@ -83,10 +219,10 @@ class FtypBox(Mp4Box):
         super().__init__(fp, header, parent)
         try:
             self.box_info = {
-                            'major_brand': fp.read(4).decode('utf-8'),
-                            'minor_version': "{0:#010x}".format(read_u32(fp)),
-                            'compatible_brands': []
-                            }
+                'major_brand': fp.read(4).decode('utf-8'),
+                'minor_version': "{0:#010x}".format(read_u32(fp)),
+                'compatible_brands': []
+            }
             bytes_left = self.size - (self.header.header_size + 8)
             while bytes_left > 0:
                 self.box_info['compatible_brands'].append(fp.read(4).decode('utf-8'))
@@ -129,6 +265,7 @@ class ContainerBox(Mp4Box):
 # All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
+IlstBox = ContainerBox
 
 
 class MetaBox(Mp4FullBox):
@@ -271,12 +408,20 @@ class TfhdBox(Mp4FullBox):
                 self.box_info['base_data_offset'] = read_u64(fp)
             if int(self.box_info['flags'][-1]) & 2 == 2:
                 self.box_info['sample_description_index'] = read_u32(fp)
-            if int(self.box_info['flags'][-2]) & 1 == 1:
+            if int(self.box_info['flags'][-1]) & 8 == 8:
                 self.box_info['default_sample_duration'] = read_u32(fp)
-            if int(self.box_info['flags'][-2]) & 2 == 2:
+            if int(self.box_info['flags'][-2]) & 1 == 1:
                 self.box_info['default_sample_size'] = read_u32(fp)
-            if int(self.box_info['flags'][-5]) & 2 == 2:
+            if int(self.box_info['flags'][-2]) & 2 == 2:
                 self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
+            if int(self.box_info['flags'][-5]) & 1 == 1:
+                self.box_info['duration_is_empty'] = True
+            else:
+                self.box_info['duration_is_empty'] = False
+            if int(self.box_info['flags'][-5]) & 2 == 2:
+                self.box_info['default_base_is_moof'] = True
+            else:
+                self.box_info['default_base_is_moof'] = False
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -384,7 +529,7 @@ class CprtBox(Mp4FullBox):
             else:
                 ch1 = str(chr(60 + (lang >> 10 & 31)))
                 ch2 = str(chr(60 + (lang >> 5 & 31)))
-                ch3 = str(chr(60 + (lang % 32)))
+                ch3 = str(chr(60 + (lang & 31)))
                 self.box_info['language'] = ch1 + ch2 + ch3
             bytes_left = self.size - (self.header.header_size + 2)
             self.box_info['name'] = fp.read(bytes_left).decode('utf-8', errors="ignore")
@@ -889,9 +1034,9 @@ class StshBox(Mp4FullBox):
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
                 self.box_info['entry_list'].append({
-                                                    'shadowed_sample_number': read_u32(fp),
-                                                    'sync_sample_number': read_u32(fp)
-                                                    })
+                    'shadowed_sample_number': read_u32(fp),
+                    'sync_sample_number': read_u32(fp)
+                })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -974,16 +1119,16 @@ class SubsBox(Mp4FullBox):
                         discardable = read_u8(fp)
                         codec_specific_parameters = read_u32(fp)
                         subsample_list.append({
-                                                'subsample_size': subsample_size,
-                                                'subsample_priority': subsample_priority,
-                                                'discardable': discardable,
-                                                'codec_specific_parameters': codec_specific_parameters
-                                              })
+                            'subsample_size': subsample_size,
+                            'subsample_priority': subsample_priority,
+                            'discardable': discardable,
+                            'codec_specific_parameters': codec_specific_parameters
+                        })
                     self.box_info['entry_list'].append({
-                                                        'sample_delta': sample_delta,
-                                                        'subsample_count': subsample_count,
-                                                        'subsample_list': subsample_list
-                                                      })
+                        'sample_delta': sample_delta,
+                        'subsample_count': subsample_count,
+                        'subsample_list': subsample_list
+                    })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1000,9 +1145,9 @@ class SbgpBox(Mp4FullBox):
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
                 self.box_info['entry_list'].append({
-                                                    'sample_count': read_u32(fp),
-                                                    'group_description_index': read_u32(fp)
-                                                  })
+                    'sample_count': read_u32(fp),
+                    'group_description_index': read_u32(fp)
+                })
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1089,16 +1234,15 @@ class Stz2Box(Mp4FullBox):
         try:
             self.box_info['field_size'] = read_u32(fp)
             self.box_info['sample_count'] = read_u32(fp)
-            if self.box_info['sample_size'] == 0:
-                self.box_info['entry_list'] = []
-                for i in range(self.box_info['sample_count']):
-                    if self.box_info['field_size'] == 4:
-                        mybyte = read_u8(fp)
-                        self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
-                    if self.box_info['field_size'] == 8:
-                        self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
-                    if self.box_info['field_size'] == 16:
-                        self.box_info['entry_list'].append({'entry_size': read_u16(fp)})
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['sample_count']):
+                if self.box_info['field_size'] == 4:
+                    mybyte = read_u8(fp)
+                    self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
+                if self.box_info['field_size'] == 8:
+                    self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
+                if self.box_info['field_size'] == 16:
+                    self.box_info['entry_list'].append({'entry_size': read_u16(fp)})
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1141,11 +1285,11 @@ class SdtpBox(Mp4FullBox):
             is_depended_on = the_byte >> 2 & 3
             has_redundancy = the_byte & 3
             self.box_info['sample_list'].append({
-                                                'is_leading': is_leading,
-                                                'sample_depends_on': depends_on,
-                                                'sample_is_depended_on': is_depended_on,
-                                                'sample_has_redundancy': has_redundancy
-                                                })
+                'is_leading': is_leading,
+                'sample_depends_on': depends_on,
+                'sample_is_depended_on': is_depended_on,
+                'sample_has_redundancy': has_redundancy
+            })
         fp.seek(fp_orig)
 
 
@@ -1170,13 +1314,13 @@ class SidxBox(Mp4FullBox):
                 subsegment_dur = read_u32(fp)
                 st_sz = read_u32(fp)
                 self.box_info['reference_list'].append({
-                                                        'reference_type': rt_sz >> 31,
-                                                        'reference_size': rt_sz % 2147483648,
-                                                        'subsegment_duration': subsegment_dur,
-                                                        'starts_with_sap': st_sz >> 31,
-                                                        'SAP_type': st_sz >> 28 & 7,
-                                                        'SAP_delta_time': st_sz % 268435456
-                                                      })
+                    'reference_type': rt_sz >> 31,
+                    'reference_size': rt_sz % 2147483648,
+                    'subsegment_duration': subsegment_dur,
+                    'starts_with_sap': st_sz >> 31,
+                    'SAP_type': st_sz >> 28 & 7,
+                    'SAP_delta_time': st_sz % 268435456
+                })
         finally:
             fp.seek(self.start_of_box + self.size)
 
