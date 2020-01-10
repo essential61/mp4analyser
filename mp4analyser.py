@@ -207,7 +207,7 @@ class MyApp(Tk):
             idx_chunk = int(item_id.split('_')[1])
             idx_mdat = int(self.tree.parent(item_id))
             chunk_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]
-            self.populate_text_widget_json_dictionary(chunk_dict)
+            self.populate_text_widget(json.dumps(chunk_dict, indent=2))
             if 'chunk_offset' in chunk_dict:
                 byte_offset = chunk_dict['chunk_offset']
                 last_sample = chunk_dict['chunk_samples'][-1]
@@ -226,7 +226,7 @@ class MyApp(Tk):
                 sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['chunk_samples'][idx_sample]
             else:
                 sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['run_samples'][idx_sample]
-            self.populate_text_widget_json_dictionary(sample_dict)
+            self.populate_text_widget(json.dumps(sample_dict, indent=2))
             byte_offset = sample_dict['offset']
             num_bytes = sample_dict['size']
             self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
@@ -238,6 +238,9 @@ class MyApp(Tk):
                 box_selected = self.mp4file.child_boxes[l[0]]
                 if box_selected.type == 'mdat' and box_selected.sample_list \
                         and not self.tree.get_children(self.tree.focus()):
+                    # for large files may take a few seconds to load
+                    self.populate_text_widget("Loading Samples...")
+                    self.update_idletasks()
                     for chunk_idx, chunk in enumerate(box_selected.sample_list):
                         if 'chunk_ID' in chunk:
                             item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
@@ -281,14 +284,13 @@ class MyApp(Tk):
                 box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
                     l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
             logging.debug("Populating text widgets")
-            self.populate_text_widget(box_selected)
+            self.prepare_string_for_text_widget(box_selected)
             logging.debug("Upper text widget populated")
             self.populate_hex_text_widget(box_selected.get_bytes())
             logging.debug("Hex text widget populated")
             self.statustext.set("")
 
-    def populate_text_widget(self, box_selected):
-        self.t.delete(1.0, END)
+    def prepare_string_for_text_widget(self, box_selected):
         my_string = "Box is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.start_of_box)
         my_string += "Has header:\n{0:s}\n\n".format(json.dumps(box_selected.header.get_header()))
         if len(box_selected.box_info) > 0:
@@ -296,12 +298,11 @@ class MyApp(Tk):
             my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.box_info, indent=2))
         if len(box_selected.child_boxes) > 0:
             my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.child_boxes])
-        logging.debug("JSON string prepared")
-        self.t.insert(END, my_string)
+        self.populate_text_widget(my_string)
 
-    def populate_text_widget_json_dictionary(self, the_dictionary):
+    def populate_text_widget(self, the_string):
         self.t.delete(1.0, END)
-        self.t.insert(END, json.dumps(the_dictionary, indent=2))
+        self.t.insert(END, the_string)
 
     def populate_hex_text_widget(self, my_byte_list):
         bytes_per_line = 32  # Num bytes per line
