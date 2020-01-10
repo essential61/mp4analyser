@@ -7,6 +7,7 @@ A box_factory function has also been defined, primarily to minimise coupling bet
 
 """
 import datetime
+import logging
 
 import mp4.non_iso
 from mp4.core import *
@@ -62,14 +63,13 @@ class Mp4File:
                     f.seek(-4, 1)
         f.close()
         self._generate_samples_from_moov()
-        # TODO moof/mdats media segments
         self._generate_samples_in_media_segments()
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
         mdats = sorted([mbox for mbox in self.child_boxes if mbox.type == 'mdat'], key=lambda k: k.size, reverse=True)
         # generate a sample list if there is a moov that contains traks N.B only ever 0,1 moov boxes
-        if len([box for box in self.child_boxes if box.type == 'moov']):
+        if [box for box in self.child_boxes if box.type == 'moov']:
             moov = [box for box in self.child_boxes if box.type == 'moov'][0]
             traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
             sample_list = []
@@ -121,8 +121,8 @@ class Mp4File:
                         sample_offset += sample['entry_size']
                     sample_list.append(chunk_dict)
                     sample_idx += samples_per_chunk
-            # len(sample_list) could be zero, say, for mpeg-dash initialization segment
-            if len(sample_list):
+            # sample_list could be empty, say, for mpeg-dash initialization segment
+            if sample_list:
                 # sort by chunk offset to get interleaved list
                 sample_list.sort(key=lambda k: k['chunk_offset'])
                 # It's reasonable to assume samples will be located within largest mdat in the the file, but to be sure.
@@ -130,7 +130,8 @@ class Mp4File:
                 max_chunk_offset = sample_list[-1]['chunk_offset']
                 for mdat in mdats:
                     if mdat.start_of_box < min_chunk_offset and (mdat.start_of_box + mdat.size) > max_chunk_offset:
-                        mdat.box_info = sample_list
+                        mdat.box_info['message'] = 'Has samples.'
+                        mdat.sample_list = sample_list
                         break
 
     def _generate_samples_in_media_segments(self):
@@ -183,10 +184,8 @@ class Mp4File:
                         for mdat in media_segment['mdat_boxes']:
                             if mdat.start_of_box < run_dict['run_offset'] and (mdat.start_of_box
                                                                                + mdat.size) >= data_offset:
-                                if type(mdat.box_info) is list:
-                                    mdat.box_info.append(run_dict)
-                                else:
-                                    mdat.box_info = [run_dict]
+                                mdat.box_info['message'] = 'Has samples.'
+                                mdat.sample_list.append(run_dict)
             i += 1
 
     def read_bytes(self, offset, num_bytes):
@@ -286,8 +285,10 @@ class MetaBox(Mp4FullBox):
 class MdatBox(Mp4Box):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
+        self.sample_list = []
         try:
-            self.box_info['message'] = 'If mdat > 1 MB only the first 1 MB will be shown in the hex view'
+            self.box_info['message'] = 'No samples found.'
+
         finally:
             fp.seek(self.start_of_box + self.size)
 
