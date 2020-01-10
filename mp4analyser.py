@@ -54,8 +54,8 @@ class MyApp(Tk):
     def __init__(self):
         super().__init__()
         # uncomment desired logging level
-        logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
-        # logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
+        #logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
+        logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
 
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")

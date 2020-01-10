@@ -11,7 +11,7 @@ It should work on any platform that can run a Python interpreter and support TKi
 Use the latest version of Python (3.7+). Depending on the Python distribution for your platform, you may also need to install idle3.
 
 # Status #
-Working pretty well.
+Very high. A prince among mp4 parsers.
 
 ## TODO: ##
 * Keep adding boxes.
