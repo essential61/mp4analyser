@@ -38,9 +38,6 @@ class UndefinedBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-IlstBox = mp4.iso.ContainerBoxContainerBox
-
-
 class Avc1Box(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
