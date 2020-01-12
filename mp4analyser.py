@@ -361,7 +361,7 @@ class MyApp(Tk):
             self.copymenu.entryconfig("Copy Selection", state="disabled")
 
     def select_all(self, twidget):
-        twidget.tag_add("sel","1.0","end")
+        twidget.tag_add(SEL,"1.0","end")
         self.copymenu.entryconfig("Copy Selection", state="normal")
 
 
