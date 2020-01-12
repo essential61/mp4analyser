@@ -66,23 +66,6 @@ class MyApp(Tk):
         self.rowconfigure(0, weight=1)
         self.geometry('1300x700')
 
-        # build a menu bar
-        self.option_add('*tearOff', FALSE)
-        self.menubar = Menu(self)
-
-        self.filemenu = Menu(self.menubar)
-        self.filemenu.add_command(label="Open...", command=self.open_file)
-        self.filemenu.add_separator()
-        self.filemenu.add_command(label="Exit", command=self.quit)
-        self.menubar.add_cascade(label="File", menu=self.filemenu)
-        self.config(menu=self.menubar)
-
-        # status bar
-        self.statustext = StringVar()
-        self.statustext.set("")
-        self.status = Label(self, textvariable=self.statustext, bd=1, anchor=W)
-        self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
-
         # create left-right paned window
         self.p = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.p.grid(column=0, row=0, sticky=(N, W, E, S))
@@ -129,6 +112,7 @@ class MyApp(Tk):
         # text widget display details of selected box
         self.t = ReadOnlyText(self.f2, state='normal', width=120, height=24, wrap='none')
         self.t.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.t.bind('<ButtonRelease-1>', self.check_if_selection)
 
         # Sub-classed auto hiding scroll bar
         self.scroll2 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.t.yview)
@@ -138,6 +122,7 @@ class MyApp(Tk):
         # text widget displaying hex
         self.thex = ReadOnlyText(self.f3, state='normal', width=120, height=15, wrap='none')
         self.thex.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.thex.bind('<ButtonRelease-1>', self.check_if_selection)
 
         # Sub-classed auto hiding scroll bar
         self.scroll3 = AutoScrollbar(self.f3, orient=VERTICAL, command=self.thex.yview)
@@ -148,6 +133,33 @@ class MyApp(Tk):
         self.scroll4 = AutoScrollbar(self.f3, orient=HORIZONTAL, command=self.thex.xview)
         self.scroll4.grid(column=0, row=1, sticky=(W, E))
         self.thex['xscrollcommand'] = self.scroll4.set
+
+        # build a menu bar
+        self.option_add('*tearOff', FALSE)
+        self.menubar = Menu(self)
+
+        self.filemenu = Menu(self.menubar)
+        self.filemenu.add_command(label="Open...", command=self.open_file)
+        self.filemenu.add_separator()
+        self.filemenu.add_command(label="Exit", command=self.quit)
+        self.menubar.add_cascade(label="File", menu=self.filemenu)
+
+        self.copymenu = Menu(self.menubar)
+        self.copymenu.add_command(label="Copy Selection", command=self.copy_selection, state="disabled")
+        self.copymenu.add_separator()
+        self.copymenu.add_command(label="\"Box Details\" - Select All",
+                                  command=lambda: self.select_all(self.t), state="disabled")
+        self.copymenu.add_command(label="\"Hex View\" - Select All",
+                                  command=lambda: self.select_all(self.thex), state="disabled")
+        self.menubar.add_cascade(label="Copy", menu=self.copymenu)
+
+        self.config(menu=self.menubar)
+
+        # status bar
+        self.statustext = StringVar()
+        self.statustext.set("")
+        self.status = Label(self, textvariable=self.statustext, bd=1, anchor=W)
+        self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
 
     def open_file(self):
         """ Callback on selecting 'Open' from menu """
@@ -166,6 +178,8 @@ class MyApp(Tk):
         self.tree.delete(*self.tree.get_children())
         self.t.delete(1.0, END)
         self.thex.delete(1.0, END)
+        self.copymenu.entryconfig("\"Box Details\" - Select All", state="disabled")
+        self.copymenu.entryconfig("\"Hex View\" - Select All", state="disabled")
         # Now fill tree with new contents
         for l0, this_box in enumerate(self.mp4file.child_boxes):
             self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
@@ -303,6 +317,7 @@ class MyApp(Tk):
     def populate_text_widget(self, the_string):
         self.t.delete(1.0, END)
         self.t.insert(END, the_string)
+        self.copymenu.entryconfig("\"Box Details\" - Select All", state="normal")
 
     def populate_hex_text_widget(self, my_byte_list):
         bytes_per_line = 32  # Num bytes per line
@@ -329,6 +344,25 @@ class MyApp(Tk):
             self.thex.insert(END, 'Hex view, showing first {0:d} bytes: \n{1:s}'.format(trunc_size, hex_string))
         else:
             self.thex.insert(END, 'Hex view: \n{0:s}'.format(hex_string))
+        self.copymenu.entryconfig("\"Hex View\" - Select All", state="normal")
+
+    def copy_selection(self):
+        self.clipboard_clear()
+        if self.t.tag_ranges(SEL):
+            self.clipboard_append(self.t.get(*self.t.tag_ranges(SEL)))
+        if self.thex.tag_ranges(SEL):
+            self.clipboard_append(self.thex.get(*self.thex.tag_ranges(SEL)))
+
+    def check_if_selection(self, a):
+        # event occurs for either widget not both, but we want to check both
+        if self.t.tag_ranges(SEL) or self.thex.tag_ranges(SEL):
+            self.copymenu.entryconfig("Copy Selection", state="normal")
+        else:
+            self.copymenu.entryconfig("Copy Selection", state="disabled")
+
+    def select_all(self, twidget):
+        twidget.tag_add("sel","1.0","end")
+        self.copymenu.entryconfig("Copy Selection", state="normal")
 
 
 if __name__ == '__main__':
