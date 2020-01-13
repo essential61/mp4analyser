@@ -302,7 +302,8 @@ class MyApp(Tk):
             logging.debug("Upper text widget populated")
             self.populate_hex_text_widget(box_selected.get_bytes())
             logging.debug("Hex text widget populated")
-            self.statustext.set("")
+        self.statustext.set("")
+        self.update_idletasks()
 
     def prepare_string_for_text_widget(self, box_selected):
         my_string = "Box is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.start_of_box)
@@ -323,7 +324,7 @@ class MyApp(Tk):
         bytes_per_line = 32  # Num bytes per line
         # trunc_size = arbitrary max. number of bytes to display in hex view to prevent tk text widget barfing.
         # change to suit
-        trunc_size = 1000000
+        trunc_size = 100000
         self.thex.delete(1.0, END)
         trunc = False
         if len(my_byte_list) > trunc_size:
