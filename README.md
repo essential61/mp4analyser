@@ -7,7 +7,10 @@ I believe the use of Python allows any technically-minded individual to add thei
 
 It should work on any platform that can run a Python interpreter and support TKinter.
 
-# Prerequisites #
+# Screenshot #
+![alt text](./images/mp4analyser.png)
+
+# Pre-Requisites #
 Use the latest version of Python (3.7+). Depending on the Python distribution for your platform, you may also need to install idle3.
 
 # Status #
