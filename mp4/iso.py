@@ -33,7 +33,8 @@ def box_factory(fp, header, parent):
     an instance of that class.
     """
     the_box = None
-    box_type = header.type.replace(" ", "_")
+    # Normalise header type so it can be expressed in a Python Class name
+    box_type = header.type.replace(" ", "_").replace("-", "_").lower()
     _box_class = globals().get(
         box_type.capitalize() + 'Box')  # globals() Return a dictionary representing the current global symbol table
     if _box_class:
