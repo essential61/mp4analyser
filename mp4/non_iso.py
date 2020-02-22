@@ -51,16 +51,13 @@ class Avc1Box(Mp4FullBox):
             self.box_info['vertresolution'] = "{0:#010x}".format(read_u32(fp))
             fp.seek(4, 1)
             self.box_info['frame_count'] = read_u16(fp)
-            self.box_info['compressorname'] = "{0:#010x}".format(read_u32(fp))
-            # a 16-bit int value of -1 seems to be used as a marker in front of any child boxes
-            bytes_left = self.start_of_box + self.size - fp.tell()
-            while bytes_left > 0 and read_i16(fp) != -1:
-                bytes_left -= 2
-            bytes_left -= 2    # need this because there is no do ...until in Python
-            fp.seek(-4, 1)
+            compressornames_size = read_u8(fp)
+            compressorname_size = read_u8(fp)
+            self.box_info['CompressorName'] = fp.read(compressorname_size).decode('utf-8', errors="ignore")
+            padding = fp.read(30 - compressorname_size)
             self.box_info['depth'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['pre-defined'] = read_i16(fp)
-            # need to check this is correct
+            self.box_info['ColorTableIndex'] = "{0:#06x}".format(read_u16(fp))
+            bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = mp4.iso.box_factory(fp, current_header, self)
