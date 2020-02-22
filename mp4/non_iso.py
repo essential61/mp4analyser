@@ -70,7 +70,9 @@ class Avc1Box(Mp4FullBox):
             fp.seek(self.start_of_box + self.size)
 
 
-DvheBox = Dvh1Box = DvavBox = Dva1Box = Hvc1Box = Hev1Box = Avc3Box = Avc1Box
+DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
+Hvc1Box = Hev1Box = Avc1Box
+Avc4Box = Avc3Box = Avc2Box = Avc1Box
 
 
 class AvccBox(Mp4Box):
