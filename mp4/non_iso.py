@@ -163,6 +163,26 @@ class HvccBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
+class DvccBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['dv_version_major'] = read_u8(fp)
+            self.box_info['dv_version_minor'] = read_u8(fp)
+            nextTwoBytes = read_u16(fp)
+            self.box_info['dv_profile'] = (nextTwoBytes >> 9) & 0x7f
+            self.box_info['dv_level'] = (nextTwoBytes >> 3) & 0x3f
+            self.box_info['rpu_present_flag'] = (nextTwoBytes >> 2) & 0x01
+            self.box_info['el_present_flag'] = (nextTwoBytes >> 1) & 0x01
+            self.box_info['bl_present_flag'] = nextTwoBytes & 0x01
+            self.box_info['dv_bl_signal_compatibility_id'] = read_u8(fp) >> 4
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+DvvcBox = DvccBox
+
 class BtrtBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
