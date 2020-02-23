@@ -51,10 +51,10 @@ class Avc1Box(Mp4FullBox):
             fp.seek(4, 1)
             self.box_info['frame_count'] = read_u16(fp)
             compressorname_size = read_u8(fp)
-            self.box_info['CompressorName'] = fp.read(compressorname_size).decode('utf-8', errors="ignore")
+            self.box_info['compressorname'] = fp.read(compressorname_size).decode('utf-8', errors="ignore")
             padding = fp.read(31 - compressorname_size)
             self.box_info['depth'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['ColorTableIndex'] = "{0:#06x}".format(read_u16(fp))
+            self.box_info['pre_defined'] = read_i16(fp)
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
                 current_header = Header(fp)
