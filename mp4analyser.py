@@ -14,6 +14,7 @@ import json
 import binascii
 from tkinter import *
 from tkinter import filedialog
+from tkinter import messagebox
 from tkinter import ttk
 # mp4 is the package that actually parses the mp4 file
 import mp4.iso
@@ -173,6 +174,12 @@ class MyApp(Tk):
         self.mp4file = mp4.iso.Mp4File(filename)
         logging.debug("Finished loading file " + filename)
         self.dialog_dir, filename_base = os.path.split(filename)
+        # sanity check that it is an ISO BMFF file
+        if len(self.mp4file.child_boxes) == 0 or (len(self.mp4file.child_boxes) == 1 and
+                                                  isinstance(self.mp4file.child_boxes[0], mp4.non_iso.UndefinedBox)):
+            logging.error(filename + " does not appear to be a valid ISO BMFF file.")
+            messagebox.showerror(message=filename_base + " does not appear to be a valid ISO BMFF file.")
+            return
         self.title("MP4 Analyser - {0:s}".format(filename_base))
         # Clear tree and text widgets if not empty
         self.tree.delete(*self.tree.get_children())
