@@ -179,6 +179,7 @@ class DvccBox(Mp4Box):
 
 DvvcBox = DvccBox
 
+
 class BtrtBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
