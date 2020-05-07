@@ -158,7 +158,9 @@ class HvccBox(Mp4Box):
         finally:
             fp.seek(self.start_of_box + self.size)
 
-
+HvceBox = HvccBox
+            
+            
 class DvccBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
