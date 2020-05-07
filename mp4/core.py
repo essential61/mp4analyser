@@ -69,7 +69,6 @@ class Header:
         """
         start_of_box = fp.tell()
         self._size = read_u32(fp)
-        #self.type = fp.read(4).decode('utf-8', errors="ignore")
         my_4bytes = fp.read(4)
         if (struct.unpack('>I', my_4bytes)[0]) >> 24 == 169:
             self.type = my_4bytes[1:].decode('utf-8')

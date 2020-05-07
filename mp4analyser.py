@@ -14,6 +14,7 @@ import json
 import binascii
 from tkinter import *
 from tkinter import filedialog
+from tkinter import messagebox
 from tkinter import ttk
 # mp4 is the package that actually parses the mp4 file
 import mp4.iso
@@ -55,7 +56,7 @@ class MyApp(Tk):
         super().__init__()
         # uncomment desired logging level
         #logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
-        logging.basicConfig(format = "%(asctime)s %(message)s", level=logging.WARNING)
+        logging.basicConfig(format="%(asctime)s %(message)s", level=logging.WARNING)
 
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")
@@ -70,7 +71,7 @@ class MyApp(Tk):
         self.p = ttk.Panedwindow(self, orient=HORIZONTAL)
         self.p.grid(column=0, row=0, sticky=(N, W, E, S))
 
-        # create left-right paned window
+        # create top-bottom paned window
         self.p1 = ttk.Panedwindow(self.p, orient=VERTICAL)
         self.p1.grid(column=0, row=0, sticky=(N, W, E, S))
 
@@ -170,8 +171,15 @@ class MyApp(Tk):
         logging.debug("Loading file " + filename)
         self.statustext.set("Loading...")
         self.update_idletasks()
-        self.mp4file = mp4.iso.Mp4File(filename)
+        new_file = mp4.iso.Mp4File(filename)
         logging.debug("Finished loading file " + filename)
+        # sanity check that it is an ISO BMFF file
+        if len(new_file.child_boxes) == 0 or \
+            (len(new_file.child_boxes) == 1 and isinstance(new_file.child_boxes[0], mp4.non_iso.UndefinedBox)):
+            logging.error(filename + " does not appear to be a valid ISO BMFF file.")
+            messagebox.showerror(message=filename + " does not appear to be a valid ISO BMFF file.")
+            return
+        self.mp4file = new_file
         self.dialog_dir, filename_base = os.path.split(filename)
         self.title("MP4 Analyser - {0:s}".format(filename_base))
         # Clear tree and text widgets if not empty
@@ -217,93 +225,104 @@ class MyApp(Tk):
         self.statustext.set("Loading...")
         self.update_idletasks()
         if self.tree.focus()[0:5] == 'chunk':
-            item_id = self.tree.focus()
-            idx_chunk = int(item_id.split('_')[1])
-            idx_mdat = int(self.tree.parent(item_id))
-            chunk_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]
-            self.populate_text_widget(json.dumps(chunk_dict, indent=2))
-            if 'chunk_offset' in chunk_dict:
-                byte_offset = chunk_dict['chunk_offset']
-                last_sample = chunk_dict['chunk_samples'][-1]
-            else:
-                byte_offset = chunk_dict['run_offset']
-                last_sample = chunk_dict['run_samples'][-1]
-            num_bytes = (last_sample['offset'] + last_sample['size']) - byte_offset
-            self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
+            self.select_chunk_details(self.tree.focus())
         elif self.tree.focus()[0:6] == 'sample':
-            item_id = self.tree.focus()
-            idx_sample = int(item_id.split('.')[1])
-            parent_id = self.tree.parent(item_id)
-            idx_chunk = int(parent_id.split('_')[1])
-            idx_mdat = int(self.tree.parent(parent_id))
-            if 'chunk_samples' in self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]:
-                sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['chunk_samples'][idx_sample]
-            else:
-                sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['run_samples'][idx_sample]
-            self.populate_text_widget(json.dumps(sample_dict, indent=2))
-            byte_offset = sample_dict['offset']
-            num_bytes = sample_dict['size']
-            self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
+            self.select_sample_details(self.tree.focus())
         else:
-            # self.tree.focus() returns id in the form  n.n.n as text
-            l = [int(i) for i in self.tree.focus().split('.')]
-            box_selected = None
-            if len(l) == 1:
-                box_selected = self.mp4file.child_boxes[l[0]]
-                if box_selected.type == 'mdat' and box_selected.sample_list \
-                        and not self.tree.get_children(self.tree.focus()):
-                    # for large files may take a few seconds to load
-                    self.populate_text_widget("Loading Samples...")
-                    self.update_idletasks()
-                    for chunk_idx, chunk in enumerate(box_selected.sample_list):
-                        if 'chunk_ID' in chunk:
-                            item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
-                            self.tree.insert(str(l[0]), 'end', "chunk_{0}".format(chunk_idx), text=item_text)
-                            for sample_idx, sample in enumerate(chunk['chunk_samples']):
-                                item_text = "sample {0}".format(sample['sample_ID'])
-                                self.tree.insert("chunk_{0}".format(chunk_idx), 'end',
-                                                 "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
-                        else:  # fragmented mp4 uses term "run" instead of "chunk" but is otherwise same
-                            item_text = "track {0}, seq {1}, run {2}".format(chunk['track_ID'],
-                                                                             chunk['sequence_number'],
-                                                                             chunk['run_ID'])
-                            self.tree.insert(str(l[0]),
-                                             'end',
-                                             "chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
-                                             text=item_text)
-                            for sample_idx, sample in enumerate(chunk['run_samples']):
-                                item_text = "sample {0}".format(sample['sample_ID'])
-                                self.tree.insert("chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
-                                                 'end',
-                                                 "sample-{0}_{1}.{2}".format(chunk['sequence_number'],
-                                                                             chunk_idx,
-                                                                             sample_idx),
-                                                 text=item_text)
-            elif len(l) == 2:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]]
-            elif len(l) == 3:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]]
-            elif len(l) == 4:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[l[3]]
-            elif len(l) == 5:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                    l[3]].child_boxes[l[4]]
-            elif len(l) == 6:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                    l[3]].child_boxes[l[4]].child_boxes[l[5]]
-            elif len(l) == 7:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                    l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]]
-            elif len(l) == 8:
-                box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
-                    l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
-            logging.debug("Populating text widgets")
-            self.prepare_string_for_text_widget(box_selected)
-            logging.debug("Upper text widget populated")
-            self.populate_hex_text_widget(box_selected.get_bytes())
-            logging.debug("Hex text widget populated")
+            self.select_box_details(self.tree.focus())
         self.statustext.set("")
         self.update_idletasks()
+
+    def select_chunk_details(self, item_id):
+        """ if tree item selected is a media chunk (or equivalent 'run' for fragmented mp4) """
+        idx_chunk = int(item_id.split('_')[1])
+        idx_mdat = int(self.tree.parent(item_id))
+        chunk_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]
+        self.populate_text_widget(json.dumps(chunk_dict, indent=2))
+        if 'chunk_offset' in chunk_dict:
+            byte_offset = chunk_dict['chunk_offset']
+            last_sample = chunk_dict['chunk_samples'][-1]
+        else:
+            byte_offset = chunk_dict['run_offset']
+            last_sample = chunk_dict['run_samples'][-1]
+        num_bytes = (last_sample['offset'] + last_sample['size']) - byte_offset
+        self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
+
+    def select_sample_details(self, item_id):
+        """ if tree item selected is a media sample """
+        idx_sample = int(item_id.split('.')[1])
+        parent_id = self.tree.parent(item_id)
+        idx_chunk = int(parent_id.split('_')[1])
+        idx_mdat = int(self.tree.parent(parent_id))
+        if 'chunk_samples' in self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]:
+            sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['chunk_samples'][idx_sample]
+        else:
+            sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['run_samples'][idx_sample]
+        self.populate_text_widget(json.dumps(sample_dict, indent=2))
+        byte_offset = sample_dict['offset']
+        num_bytes = sample_dict['size']
+        self.populate_hex_text_widget(self.mp4file.read_bytes(byte_offset, num_bytes))
+
+    def select_box_details(self, item_id):
+        """ if tree item selected is 'box' or 'atom' """
+        # item id is in the form  n.n.n as text
+        l = [int(i) for i in item_id.split('.')]
+        box_selected = None
+        if len(l) == 1:
+            box_selected = self.mp4file.child_boxes[l[0]]
+            # specific case of mdat box selected and chunks/samples in mdat not yet loaded in tree
+            if box_selected.type == 'mdat' and box_selected.sample_list and not self.tree.get_children(item_id):
+                self.populate_tree_with_samples_in_mdat(item_id)
+        elif len(l) == 2:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]]
+        elif len(l) == 3:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]]
+        elif len(l) == 4:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[l[3]]
+        elif len(l) == 5:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]]
+        elif len(l) == 6:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]]
+        elif len(l) == 7:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]]
+        elif len(l) == 8:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
+        logging.debug("Populating text widgets")
+        self.prepare_string_for_text_widget(box_selected)
+        logging.debug("Upper text widget populated")
+        self.populate_hex_text_widget(box_selected.get_bytes())
+        logging.debug("Hex text widget populated")
+
+    def populate_tree_with_samples_in_mdat(self, mdat_id):
+        # for large files may take a few seconds to load
+        self.populate_text_widget("Loading Samples...")
+        self.update_idletasks()
+        mdat = self.mp4file.child_boxes[int(mdat_id)]
+        for chunk_idx, chunk in enumerate(mdat.sample_list):
+            if 'chunk_ID' in chunk:
+                item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
+                self.tree.insert(mdat_id, 'end', "chunk_{0}".format(chunk_idx), text=item_text)
+                for sample_idx, sample in enumerate(chunk['chunk_samples']):
+                    item_text = "sample {0}".format(sample['sample_ID'])
+                    self.tree.insert("chunk_{0}".format(chunk_idx), 'end',
+                                     "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
+            else:  # fragmented mp4 uses term "run" instead of "chunk" but is otherwise same
+                item_text = "track {0}, seq {1}, run {2}".format(chunk['track_ID'], chunk['sequence_number'],
+                                                                 chunk['run_ID'])
+                self.tree.insert(mdat_id,
+                                 'end',
+                                 "chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
+                                 text=item_text)
+                for sample_idx, sample in enumerate(chunk['run_samples']):
+                    item_text = "sample {0}".format(sample['sample_ID'])
+                    self.tree.insert("chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
+                                     'end',
+                                     "sample-{0}_{1}.{2}".format(chunk['sequence_number'], chunk_idx, sample_idx),
+                                     text=item_text)
 
     def prepare_string_for_text_widget(self, box_selected):
         my_string = "Box is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.start_of_box)
@@ -362,7 +381,7 @@ class MyApp(Tk):
             self.copymenu.entryconfig("Copy Selection", state="disabled")
 
     def select_all(self, twidget):
-        twidget.tag_add(SEL,"1.0","end")
+        twidget.tag_add(SEL, "1.0", "end")
         self.copymenu.entryconfig("Copy Selection", state="normal")
 
 
