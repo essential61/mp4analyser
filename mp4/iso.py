@@ -545,7 +545,7 @@ class TselBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['switch_group'] = read_u32(fp)
-            bytes_left = self.size - (self.header.length + 8)
+            bytes_left = self.size - (self.header.header_size + 8)
             attr_list = []
             while bytes_left > 0:
                 attr_list.append(fp.read(4).decode('utf-8'))
@@ -563,7 +563,7 @@ class StriBox(Mp4FullBox):
             self.box_info['switch_group'] = read_u16(fp)
             self.box_info['alternate_group'] = read_u16(fp)
             self.box_info['sub_track_ID'] = read_u32(fp)
-            bytes_left = self.size - (self.header.length + 12)
+            bytes_left = self.size - (self.header.header_size + 12)
             attr_list = []
             while bytes_left > 0:
                 attr_list.append(fp.read(4).decode('utf-8'))
@@ -658,7 +658,7 @@ class SchmBox(Mp4FullBox):
             self.box_info['scheme_type'] = fp.read(4).decode('utf-8')
             self.box_info['scheme_version'] = read_u32(fp)
             if int(self.box_info['flags'][-1], 16) & 1 == 1:
-                self.box_info['data_offset'] = fp.read(self.size - (self.header.length + 12)).decode('utf-8')
+                self.box_info['data_offset'] = fp.read(self.size - (self.header.header_size + 12)).decode('utf-8')
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -668,7 +668,7 @@ class Xml_Box(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            self.box_info['xml_data'] = fp.read(self.size - (self.header.length + 4)).decode('utf-8', errors="ignore")
+            self.box_info['xml_data'] = fp.read(self.size - (self.header.header_size + 4)).decode('utf-8', errors="ignore")
         finally:
             fp.seek(self.start_of_box + self.size)
 
