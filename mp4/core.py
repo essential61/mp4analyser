@@ -38,6 +38,10 @@ class Mp4Box:
     def type(self):
         return self.header.type
 
+    @type.setter
+    def type(self, new_value):
+        self.header.type = new_value
+
     def get_top(self):
         if self.parent.type == 'file':
             return self

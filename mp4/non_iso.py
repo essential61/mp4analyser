@@ -348,3 +348,54 @@ class SencBox(Mp4FullBox):
                     self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')})
         finally:
             fp.seek(self.start_of_box + self.size)
+
+
+class KeysBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['entry_list'] = []
+            for k in range(self.box_info['entry_count']):
+                ksize = read_u32(fp)
+                self.box_info['entry_list'].append({
+                    'key_index': k + 1,
+                    'key_size': ksize,
+                    'key_namespace': fp.read(4).decode('utf-8'),
+                    'key_value': fp.read(ksize -8).decode('utf-8')
+                })
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class IlstBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            bytes_left = self.size - self.header.header_size
+            while bytes_left > 7:
+                current_header = Header(fp)
+                current_box = ItemBox(fp, current_header, self)
+                self.child_boxes.append(current_box)
+                bytes_left -= current_box.size
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class ItemBox(Mp4Box):
+    """
+    Don't try to create this with the box factory function
+    """
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            bytes_left = self.size - self.header.header_size
+            while bytes_left > 7:
+                current_header = Header(fp)
+                current_box = mp4.iso.box_factory(fp, current_header, self)
+                self.child_boxes.append(current_box)
+                bytes_left -= current_box.size
+        finally:
+            fp.seek(self.start_of_box + self.size)

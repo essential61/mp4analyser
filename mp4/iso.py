@@ -265,14 +265,20 @@ class ContainerBox(Mp4Box):
 # All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
-IlstBox = ContainerBox
 
 
-class MetaBox(Mp4FullBox):
-
+class MetaBox(Mp4Box):
+    """
+    Seems to be a discrepancy between Apple atom spec and ISO about whether this is a versioned box
+    """
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
+            four_bytes = read_u32(fp)
+            if four_bytes == 0:
+                self.box_info = {'version': 0, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
+            else:
+                fp.seek(-4, 1)
             bytes_left = self.size - (self.header.header_size + 4)
             while bytes_left > 7:
                 current_header = Header(fp)
@@ -289,7 +295,6 @@ class MdatBox(Mp4Box):
         self.sample_list = []
         try:
             self.box_info['message'] = 'No samples found.'
-
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -529,9 +534,9 @@ class CprtBox(Mp4FullBox):
             if lang == 0:
                 self.box_info['language'] = '0x00'
             else:
-                ch1 = str(chr(60 + (lang >> 10 & 31)))
-                ch2 = str(chr(60 + (lang >> 5 & 31)))
-                ch3 = str(chr(60 + (lang & 31)))
+                ch1 = str(chr(96 + (lang >> 10 & 31)))
+                ch2 = str(chr(96 + (lang >> 5 & 31)))
+                ch3 = str(chr(96 + (lang & 31)))
                 self.box_info['language'] = ch1 + ch2 + ch3
             bytes_left = self.size - (self.header.header_size + 2)
             self.box_info['name'] = fp.read(bytes_left).decode('utf-8', errors="ignore")
@@ -781,7 +786,6 @@ class MdhdBox(Mp4FullBox):
                 self.box_info['modification_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u64(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['timescale'] = read_u32(fp)
-                fp.seek(4, 1)
                 self.box_info['duration'] = read_u64(fp)
             else:
                 self.box_info['creation_time'] = (
@@ -789,16 +793,15 @@ class MdhdBox(Mp4FullBox):
                 self.box_info['modification_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u32(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['timescale'] = read_u32(fp)
-                fp.seek(4, 1)
                 self.box_info['duration'] = read_u32(fp)
             # I think this is right
             lang = struct.unpack('>H', fp.read(2))[0]
             if lang == 0:
                 self.box_info['language'] = '0x00'
             else:
-                ch1 = str(chr(60 + (lang >> 10 & 31)))
-                ch2 = str(chr(60 + (lang >> 5 & 31)))
-                ch3 = str(chr(60 + (lang % 32)))
+                ch1 = str(chr(96 + (lang >> 10 & 31)))
+                ch2 = str(chr(96 + (lang >> 5 & 31)))
+                ch3 = str(chr(96 + (lang % 32)))
                 self.box_info['language'] = ch1 + ch2 + ch3
         finally:
             fp.seek(self.start_of_box + self.size)
