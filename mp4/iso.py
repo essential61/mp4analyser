@@ -265,7 +265,7 @@ class ContainerBox(Mp4Box):
 # All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
-
+GmhdBox = ContainerBox
 
 class MetaBox(Mp4Box):
     """

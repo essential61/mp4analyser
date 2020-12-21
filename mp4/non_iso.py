@@ -350,6 +350,18 @@ class SencBox(Mp4FullBox):
             fp.seek(self.start_of_box + self.size)
 
 
+class GminBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['graphics_mode'] = read_u16(fp)
+            self.box_info['op_color'] = {'red': read_u16(fp), 'green': read_u16(fp), 'blue': read_u16(fp)}
+            self.box_info['balance'] = read_u16(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
 class KeysBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
@@ -377,6 +389,9 @@ class IlstBox(Mp4Box):
             bytes_left = self.size - self.header.header_size
             while bytes_left > 7:
                 current_header = Header(fp)
+                if not current_header.type.isprintable():
+                    current_header.type = "#{0:#d}".format(struct.unpack('>I', current_header.type.encode('utf-8'))[0])
+                # create box directly, not through box factory
                 current_box = ItemBox(fp, current_header, self)
                 self.child_boxes.append(current_box)
                 bytes_left -= current_box.size
@@ -385,9 +400,6 @@ class IlstBox(Mp4Box):
 
 
 class ItemBox(Mp4Box):
-    """
-    Don't try to create this with the box factory function
-    """
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
