@@ -12,6 +12,7 @@ import logging
 import mp4.non_iso
 from mp4.core import *
 from mp4.util import *
+from mp4.summary import *
 
 
 # Supported box
@@ -50,6 +51,7 @@ class Mp4File:
         self.filename = filename
         self.type = 'file'
         self.child_boxes = []
+        self.summary= {}
         with open(filename, 'rb') as f:
             end_of_file = False
             while not end_of_file:
@@ -64,7 +66,7 @@ class Mp4File:
                     f.seek(-4, 1)
         f.close()
         self._generate_samples_from_moov()
-        self._generate_samples_in_media_segments()
+        self._generate_samples_from_moofs()
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
@@ -135,7 +137,7 @@ class Mp4File:
                         mdat.sample_list = sample_list
                         break
 
-    def _generate_samples_in_media_segments(self):
+    def _generate_samples_from_moofs(self):
         """
         generate samples within mdats of media segments for fragmented mp4 files
         media segments are 1 moof (optionally preceded by an styp) followed by 1 or more contiguous mdats
@@ -196,7 +198,10 @@ class Mp4File:
         f.close()
         return bytes_read
 
-
+    def get_summary(self):
+        if not self.summary:
+            self.summary = Summary(self)
+        return self.summary.data
 # Box classes
 
 

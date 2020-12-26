@@ -55,8 +55,8 @@ class MyApp(Tk):
     def __init__(self):
         super().__init__()
         # uncomment desired logging level
-        #logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
-        logging.basicConfig(format="%(asctime)s %(message)s", level=logging.WARNING)
+        logging.basicConfig(format="%(asctime)s %(message)s", level=logging.DEBUG)
+        #logging.basicConfig(format="%(asctime)s %(message)s", level=logging.WARNING)
 
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")
@@ -215,6 +215,7 @@ class MyApp(Tk):
                                                                                           l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
+        logging.debug("Summary " + json.dumps(self.mp4file.get_summary(), indent=2))
         logging.debug("Finished populating " + filename)
         self.statustext.set("")
         self.update_idletasks()
