@@ -61,15 +61,22 @@ class MyApp(Tk):
         self.mp4file = None
         self.dialog_dir = os.path.expanduser("~")
 
+        # I don't know if there's a better a way, but this works
+        self.popup_focus = None
+
         # build ui
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
         self.geometry('1300x700')
 
-        # create left-right paned window
-        self.p = ttk.Panedwindow(self, orient=HORIZONTAL)
-        self.p.grid(column=0, row=0, sticky=(N, W, E, S))
+        # create tabbed notebook
+        self.nb = ttk.Notebook(self)
+        self.nb.grid(column=0, row=0, sticky=(N, W, E, S))
+
+        # create left-right paned window and add to tabbed notebook
+        self.p = ttk.Panedwindow(self.nb, orient=HORIZONTAL)
+        self.nb.add(self.p, text="Box Information", padding=(5, 10, 5, 5))
 
         # create top-bottom paned window
         self.p1 = ttk.Panedwindow(self.p, orient=VERTICAL)
@@ -114,6 +121,7 @@ class MyApp(Tk):
         self.t = ReadOnlyText(self.f2, state='normal', width=120, height=24, wrap='none')
         self.t.grid(column=0, row=0, sticky=(N, W, E, S))
         self.t.bind('<ButtonRelease-1>', self.check_if_selection)
+        self.t.bind("<Button-3>", self.popup_sel)
 
         # Sub-classed auto hiding scroll bar
         self.scroll2 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.t.yview)
@@ -124,6 +132,7 @@ class MyApp(Tk):
         self.thex = ReadOnlyText(self.f3, state='normal', width=120, height=15, wrap='none')
         self.thex.grid(column=0, row=0, sticky=(N, W, E, S))
         self.thex.bind('<ButtonRelease-1>', self.check_if_selection)
+        self.thex.bind("<Button-3>", self.popup_sel)
 
         # Sub-classed auto hiding scroll bar
         self.scroll3 = AutoScrollbar(self.f3, orient=VERTICAL, command=self.thex.yview)
@@ -135,26 +144,33 @@ class MyApp(Tk):
         self.scroll4.grid(column=0, row=1, sticky=(W, E))
         self.thex['xscrollcommand'] = self.scroll4.set
 
+        # create a frame and as second tab to notebook
+        self.f4 = ttk.Frame(self.nb)
+        self.nb.add(self.f4, text="File Summary")
+
+        # text widget display summary
+        self.tsum = ReadOnlyText(self.f4, state='normal')
+        self.tsum.pack(expand=True, fill='both')
+        self.tsum.bind('<ButtonRelease-1>', self.check_if_selection)
+        self.tsum.bind("<Button-3>", self.popup_sel)
+
         # build a menu bar
         self.option_add('*tearOff', FALSE)
         self.menubar = Menu(self)
-
         self.filemenu = Menu(self.menubar)
         self.filemenu.add_command(label="Open...", command=self.open_file)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=self.quit)
         self.menubar.add_cascade(label="File", menu=self.filemenu)
-
         self.copymenu = Menu(self.menubar)
         self.copymenu.add_command(label="Copy Selection", command=self.copy_selection, state="disabled")
-        self.copymenu.add_separator()
-        self.copymenu.add_command(label="\"Box Details\" - Select All",
-                                  command=lambda: self.select_all(self.t), state="disabled")
-        self.copymenu.add_command(label="\"Hex View\" - Select All",
-                                  command=lambda: self.select_all(self.thex), state="disabled")
         self.menubar.add_cascade(label="Copy", menu=self.copymenu)
-
         self.config(menu=self.menubar)
+
+        # pop-up menu
+        self.rclickmenu = Menu(self.tsum)
+        self.rclickmenu.add_command(label="Copy Selection", command=self.copy_selection, state="disabled")
+        self.rclickmenu.add_command(label="Select All", command=self.select_all)
 
         # status bar
         self.statustext = StringVar()
@@ -174,8 +190,8 @@ class MyApp(Tk):
         new_file = mp4.iso.Mp4File(filename)
         logging.debug("Finished loading file " + filename)
         # sanity check that it is an ISO BMFF file
-        if len(new_file.child_boxes) == 0 or \
-            (len(new_file.child_boxes) == 1 and isinstance(new_file.child_boxes[0], mp4.non_iso.UndefinedBox)):
+        if (len(new_file.child_boxes) == 0) or (
+                len(new_file.child_boxes) == 1 and isinstance(new_file.child_boxes[0], mp4.non_iso.UndefinedBox)):
             logging.error(filename + " does not appear to be a valid ISO BMFF file.")
             messagebox.showerror(message=filename + " does not appear to be a valid ISO BMFF file.")
             return
@@ -186,8 +202,8 @@ class MyApp(Tk):
         self.tree.delete(*self.tree.get_children())
         self.t.delete(1.0, END)
         self.thex.delete(1.0, END)
-        self.copymenu.entryconfig("\"Box Details\" - Select All", state="disabled")
-        self.copymenu.entryconfig("\"Hex View\" - Select All", state="disabled")
+        self.tsum.delete(1.0, END)
+        self.tsum.insert(END, json.dumps(self.mp4file.get_summary(), indent=2))
         # Now fill tree with new contents
         for l0, this_box in enumerate(self.mp4file.child_boxes):
             self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
@@ -215,6 +231,7 @@ class MyApp(Tk):
                                                                                           l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
+        logging.debug("Summary " + json.dumps(self.mp4file.get_summary(), indent=2))
         logging.debug("Finished populating " + filename)
         self.statustext.set("")
         self.update_idletasks()
@@ -337,7 +354,6 @@ class MyApp(Tk):
     def populate_text_widget(self, the_string):
         self.t.delete(1.0, END)
         self.t.insert(END, the_string)
-        self.copymenu.entryconfig("\"Box Details\" - Select All", state="normal")
 
     def populate_hex_text_widget(self, my_byte_list):
         bytes_per_line = 32  # Num bytes per line
@@ -364,25 +380,31 @@ class MyApp(Tk):
             self.thex.insert(END, 'Hex view, showing first {0:d} bytes: \n{1:s}'.format(trunc_size, hex_string))
         else:
             self.thex.insert(END, 'Hex view: \n{0:s}'.format(hex_string))
-        self.copymenu.entryconfig("\"Hex View\" - Select All", state="normal")
+
+    def popup_sel(self, e):
+        self.popup_focus = e.widget
+        self.check_if_selection(e)
+        self.rclickmenu.tk_popup(e.x_root, e.y_root)
 
     def copy_selection(self):
         self.clipboard_clear()
-        if self.t.tag_ranges(SEL):
-            self.clipboard_append(self.t.get(*self.t.tag_ranges(SEL)))
-        if self.thex.tag_ranges(SEL):
-            self.clipboard_append(self.thex.get(*self.thex.tag_ranges(SEL)))
+        if self.popup_focus.tag_ranges(SEL):
+            self.clipboard_append(self.popup_focus.get(*self.popup_focus.tag_ranges(SEL)))
 
     def check_if_selection(self, a):
-        # event occurs for either widget not both, but we want to check both
-        if self.t.tag_ranges(SEL) or self.thex.tag_ranges(SEL):
+        self.popup_focus = a.widget
+        # event occurs for any text widget
+        if self.popup_focus.tag_ranges(SEL):
             self.copymenu.entryconfig("Copy Selection", state="normal")
+            self.rclickmenu.entryconfig("Copy Selection", state="normal")
         else:
             self.copymenu.entryconfig("Copy Selection", state="disabled")
+            self.rclickmenu.entryconfig("Copy Selection", state="disabled")
 
-    def select_all(self, twidget):
-        twidget.tag_add(SEL, "1.0", "end")
+    def select_all(self):
+        self.popup_focus.tag_add(SEL, "1.0", "end")
         self.copymenu.entryconfig("Copy Selection", state="normal")
+        self.rclickmenu.entryconfig("Copy Selection", state="normal")
 
 
 if __name__ == '__main__':

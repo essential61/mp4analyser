@@ -66,7 +66,7 @@ class Avc1Box(Mp4FullBox):
 
 
 DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
-Hvc1Box = Hev1Box = Avc1Box
+Hvc1Box = Hev1Box = Av01Box = Avc1Box
 Avc4Box = Avc3Box = Avc2Box = Avc1Box
 
 
@@ -158,9 +158,36 @@ class HvccBox(Mp4Box):
         finally:
             fp.seek(self.start_of_box + self.size)
 
-HvceBox = HvccBox
-            
-            
+
+class Av1cBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            first_byte = read_u8(fp)
+            self.box_info['marker'] = (first_byte >> 7) & 0x01
+            self.box_info['version'] = first_byte & 0x7f
+            second_byte = read_u8(fp)
+            self.box_info['seq_profile'] = (second_byte >> 5) & 0x07
+            self.box_info['seq_level_idx_0'] = second_byte & 0x1f
+            third_byte = read_u8(fp)
+            self.box_info['seq_tier_0'] = (third_byte >> 7) & 0x01
+            self.box_info['high_bitdepth'] = (third_byte >> 6) & 0x01
+            self.box_info['twelve_bit'] = (third_byte >> 5) & 0x01
+            self.box_info['monochrome'] = (third_byte >> 4) & 0x01
+            self.box_info['chroma_subsampling_x'] = (third_byte >> 3) & 0x01
+            self.box_info['chroma_subsampling_y'] = (third_byte >> 2) & 0x01
+            self.box_info['chroma_sample_position'] = third_byte & 0x03
+            fourth_byte = read_u8(fp)
+            self.box_info['initial_presentation_delay_present'] = (fourth_byte >> 4) & 0x01
+            if self.box_info['initial_presentation_delay_present']:
+                self.box_info['initial_presentation_delay_minus_1'] = fourth_byte & 0x0f
+            bytes_left = self.size - self.header.header_size - 4
+            self.box_info['configOBUs'] = binascii.b2a_hex(fp.read(bytes_left)).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
 class DvccBox(Mp4Box):
 
     def __init__(self, fp, header, parent):
@@ -180,7 +207,6 @@ class DvccBox(Mp4Box):
 
 
 DvvcBox = DvccBox
-
 
 class BtrtBox(Mp4Box):
 
@@ -215,8 +241,8 @@ class Mp4aBox(Mp4Box):
             self.box_info['audio_encoding_version'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_encoding_revision'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_encoding_vendor'] = "{0:#010x}".format(read_u32(fp))
-            self.box_info['audio_channel_count'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['audio_sample_size'] = "{0:#06x}".format(read_u16(fp))
+            self.box_info['audio_channel_count'] = read_u16(fp)
+            self.box_info['audio_sample_size'] = read_u16(fp)
             self.box_info['audio_compression_id'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_packet_size'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_sample_rate'] = read_u16_16(fp)
@@ -349,5 +375,68 @@ class SencBox(Mp4FullBox):
                 self.box_info['sample_list'] = []
                 for i in range(self.box_info['sample_count']):
                     self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')})
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class GminBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['graphics_mode'] = read_u16(fp)
+            self.box_info['op_color'] = {'red': read_u16(fp), 'green': read_u16(fp), 'blue': read_u16(fp)}
+            self.box_info['balance'] = read_u16(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class KeysBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['entry_list'] = []
+            for k in range(self.box_info['entry_count']):
+                ksize = read_u32(fp)
+                self.box_info['entry_list'].append({
+                    'key_index': k + 1,
+                    'key_size': ksize,
+                    'key_namespace': fp.read(4).decode('utf-8'),
+                    'key_value': fp.read(ksize -8).decode('utf-8')
+                })
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class IlstBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            bytes_left = self.size - self.header.header_size
+            while bytes_left > 7:
+                current_header = Header(fp)
+                if not current_header.type.isprintable():
+                    current_header.type = "#{0:#d}".format(struct.unpack('>I', current_header.type.encode('utf-8'))[0])
+                # create box directly, not through box factory
+                current_box = ItemBox(fp, current_header, self)
+                self.child_boxes.append(current_box)
+                bytes_left -= current_box.size
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class ItemBox(Mp4Box):
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            bytes_left = self.size - self.header.header_size
+            while bytes_left > 7:
+                current_header = Header(fp)
+                current_box = mp4.iso.box_factory(fp, current_header, self)
+                self.child_boxes.append(current_box)
+                bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)

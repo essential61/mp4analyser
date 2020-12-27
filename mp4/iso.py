@@ -12,6 +12,7 @@ import logging
 import mp4.non_iso
 from mp4.core import *
 from mp4.util import *
+from mp4.summary import *
 
 
 # Supported box
@@ -50,6 +51,7 @@ class Mp4File:
         self.filename = filename
         self.type = 'file'
         self.child_boxes = []
+        self.summary= {}
         with open(filename, 'rb') as f:
             end_of_file = False
             while not end_of_file:
@@ -64,7 +66,7 @@ class Mp4File:
                     f.seek(-4, 1)
         f.close()
         self._generate_samples_from_moov()
-        self._generate_samples_in_media_segments()
+        self._generate_samples_from_moofs()
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
@@ -89,10 +91,6 @@ class Mp4File:
                 if sample_size_box.box_info['sample_size'] > 0:
                     sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
                                     for i in range(sample_size_box.box_info['sample_count'])]
-                elif sample_size_box.type == 'stz2' and sample_size_box.box_info['field_size'] == 4:
-                    # unpack array, this has not been tested
-                    sample_sizes = [{'entry_size': x} for y in sample_size_box.box_info['entry_list'] for x in
-                                    y.values()]
                 else:
                     sample_sizes = sample_size_box.box_info['entry_list']
                 sample_to_chunks = [box for box in samplebox.child_boxes
@@ -135,7 +133,7 @@ class Mp4File:
                         mdat.sample_list = sample_list
                         break
 
-    def _generate_samples_in_media_segments(self):
+    def _generate_samples_from_moofs(self):
         """
         generate samples within mdats of media segments for fragmented mp4 files
         media segments are 1 moof (optionally preceded by an styp) followed by 1 or more contiguous mdats
@@ -196,7 +194,10 @@ class Mp4File:
         f.close()
         return bytes_read
 
-
+    def get_summary(self):
+        if not self.summary:
+            self.summary = Summary(self)
+        return self.summary.data
 # Box classes
 
 
@@ -265,14 +266,20 @@ class ContainerBox(Mp4Box):
 # All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
-IlstBox = ContainerBox
+GmhdBox = ContainerBox
 
-
-class MetaBox(Mp4FullBox):
-
+class MetaBox(Mp4Box):
+    """
+    Seems to be a discrepancy between Apple atom spec and ISO about whether this is a versioned box
+    """
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
+            four_bytes = read_u32(fp)
+            if four_bytes == 0:
+                self.box_info = {'version': 0, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
+            else:
+                fp.seek(-4, 1)
             bytes_left = self.size - (self.header.header_size + 4)
             while bytes_left > 7:
                 current_header = Header(fp)
@@ -289,7 +296,6 @@ class MdatBox(Mp4Box):
         self.sample_list = []
         try:
             self.box_info['message'] = 'No samples found.'
-
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -529,9 +535,9 @@ class CprtBox(Mp4FullBox):
             if lang == 0:
                 self.box_info['language'] = '0x00'
             else:
-                ch1 = str(chr(60 + (lang >> 10 & 31)))
-                ch2 = str(chr(60 + (lang >> 5 & 31)))
-                ch3 = str(chr(60 + (lang & 31)))
+                ch1 = str(chr(96 + (lang >> 10 & 31)))
+                ch2 = str(chr(96 + (lang >> 5 & 31)))
+                ch3 = str(chr(96 + (lang & 31)))
                 self.box_info['language'] = ch1 + ch2 + ch3
             bytes_left = self.size - (self.header.header_size + 2)
             self.box_info['name'] = fp.read(bytes_left).decode('utf-8', errors="ignore")
@@ -781,7 +787,6 @@ class MdhdBox(Mp4FullBox):
                 self.box_info['modification_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u64(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['timescale'] = read_u32(fp)
-                fp.seek(4, 1)
                 self.box_info['duration'] = read_u64(fp)
             else:
                 self.box_info['creation_time'] = (
@@ -789,16 +794,15 @@ class MdhdBox(Mp4FullBox):
                 self.box_info['modification_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u32(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['timescale'] = read_u32(fp)
-                fp.seek(4, 1)
                 self.box_info['duration'] = read_u32(fp)
             # I think this is right
             lang = struct.unpack('>H', fp.read(2))[0]
             if lang == 0:
                 self.box_info['language'] = '0x00'
             else:
-                ch1 = str(chr(60 + (lang >> 10 & 31)))
-                ch2 = str(chr(60 + (lang >> 5 & 31)))
-                ch3 = str(chr(60 + (lang % 32)))
+                ch1 = str(chr(96 + (lang >> 10 & 31)))
+                ch2 = str(chr(96 + (lang >> 5 & 31)))
+                ch3 = str(chr(96 + (lang % 32)))
                 self.box_info['language'] = ch1 + ch2 + ch3
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -1240,7 +1244,7 @@ class Stz2Box(Mp4FullBox):
             for i in range(self.box_info['sample_count']):
                 if self.box_info['field_size'] == 4:
                     mybyte = read_u8(fp)
-                    self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
+                    self.box_info['entry_list'].append({'entry_size': mybyte // 16}, {'entry_size+': mybyte % 16})
                 if self.box_info['field_size'] == 8:
                     self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
                 if self.box_info['field_size'] == 16:
