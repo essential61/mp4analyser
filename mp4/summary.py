@@ -11,10 +11,10 @@ class Summary:
         boxes = mp4file.child_boxes
         self.data = {}
         self.data['filename'] = mp4file.filename
-        self.data['filesize'] = os.path.getsize(mp4file.filename)
+        self.data['filesize (bytes)'] = os.path.getsize(mp4file.filename)
         fstyp = [box for box in boxes if box.type == 'ftyp' or box.type == 'styp'][0]
         self.data['brand'] = fstyp.box_info['major_brand']
-        # check if there is a moov if there is a moov that contains traks N.B only ever 0,1 moov boxes
+        # check if there is a moov and if there is a moov that contains traks N.B only ever 0,1 moov boxes
         if [box for box in boxes if box.type == 'moov']:
             moov = [box for box in boxes if box.type == 'moov'][0]
             mvhd = [mvbox for mvbox in moov.child_boxes if mvbox.type == 'mvhd'][0]
@@ -22,10 +22,9 @@ class Summary:
             self.data['modification_time'] = mvhd.box_info['modification_time']
             self.data['duration (secs)'] = round(mvhd.box_info['duration'] / mvhd.box_info['timescale'])
             if self.data['duration (secs)'] > 0:
-                self.data['bitrate (bps)'] = round(8 * self.data['filesize'] / self.data['duration (secs)'])
+                self.data['bitrate (bps)'] = round(8 * self.data['filesize (bytes)'] / self.data['duration (secs)'])
             traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
             self.data['track_list'] = []
-            sample_list = []
             for trak in traks:
                 this_trak = {}
                 this_trak['track_id'] = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
@@ -43,9 +42,6 @@ class Summary:
                 if sz.box_info['sample_size'] > 0:
                     # uniform sample size
                     trak_size = sz.box_info['sample_size'] * sc
-                elif sz.type == 'stz2' and sz.box_info['field_size'] == 4:
-                    # unpack array, this has not been tested
-                    trak_size = sum([x for y in sz.box_info['entry_list'] for x in y.values()])
                 else:
                     trak_size = sum([entry['entry_size'] for entry in sz.box_info['entry_list']])
 

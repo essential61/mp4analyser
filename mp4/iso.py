@@ -91,10 +91,6 @@ class Mp4File:
                 if sample_size_box.box_info['sample_size'] > 0:
                     sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
                                     for i in range(sample_size_box.box_info['sample_count'])]
-                elif sample_size_box.type == 'stz2' and sample_size_box.box_info['field_size'] == 4:
-                    # unpack array, this has not been tested
-                    sample_sizes = [{'entry_size': x} for y in sample_size_box.box_info['entry_list'] for x in
-                                    y.values()]
                 else:
                     sample_sizes = sample_size_box.box_info['entry_list']
                 sample_to_chunks = [box for box in samplebox.child_boxes
@@ -1248,7 +1244,8 @@ class Stz2Box(Mp4FullBox):
             for i in range(self.box_info['sample_count']):
                 if self.box_info['field_size'] == 4:
                     mybyte = read_u8(fp)
-                    self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
+                    #self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
+                    self.box_info['entry_list'].append({'entry_size': mybyte // 16}, {'entry_size+': mybyte % 16})
                 if self.box_info['field_size'] == 8:
                     self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
                 if self.box_info['field_size'] == 16:
