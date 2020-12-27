@@ -3,6 +3,8 @@ core.py contains class definitions used by both iso.py and non_iso.py, namely cl
 that are used as parents for all the real, instantiated boxes. Also contains a header class definition.
 """
 import binascii
+import logging
+
 from mp4.util import *
 
 
