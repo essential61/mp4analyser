@@ -1244,7 +1244,6 @@ class Stz2Box(Mp4FullBox):
             for i in range(self.box_info['sample_count']):
                 if self.box_info['field_size'] == 4:
                     mybyte = read_u8(fp)
-                    #self.box_info['entry_list'].append({'entry_size': mybyte // 16, 'entry_size+': mybyte % 16})
                     self.box_info['entry_list'].append({'entry_size': mybyte // 16}, {'entry_size+': mybyte % 16})
                 if self.box_info['field_size'] == 8:
                     self.box_info['entry_list'].append({'entry_size': read_u8(fp)})
