@@ -5,7 +5,7 @@ that are used as parents for all the real, instantiated boxes. Also contains a h
 import binascii
 import logging
 
-from mp4.util import *
+from mp4analyser.util import *
 
 
 class Mp4Box:

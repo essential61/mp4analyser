@@ -17,7 +17,7 @@ from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
 # mp4 is the package that actually parses the mp4 file
-import mp4.iso
+import mp4analyser.iso
 
 try:
     from idlelib.redirector import WidgetRedirector
@@ -187,11 +187,11 @@ class MyApp(Tk):
         logging.debug("Loading file " + filename)
         self.statustext.set("Loading...")
         self.update_idletasks()
-        new_file = mp4.iso.Mp4File(filename)
+        new_file = mp4analyser.iso.Mp4File(filename)
         logging.debug("Finished loading file " + filename)
         # sanity check that it is an ISO BMFF file
         if (len(new_file.child_boxes) == 0) or (
-                len(new_file.child_boxes) == 1 and isinstance(new_file.child_boxes[0], mp4.non_iso.UndefinedBox)):
+                len(new_file.child_boxes) == 1 and isinstance(new_file.child_boxes[0], mp4analyser.non_iso.UndefinedBox)):
             logging.error(filename + " does not appear to be a valid ISO BMFF file.")
             messagebox.showerror(message=filename + " does not appear to be a valid ISO BMFF file.")
             return
