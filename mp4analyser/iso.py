@@ -9,10 +9,10 @@ A box_factory function has also been defined, primarily to minimise coupling bet
 import datetime
 import logging
 
-import mp4.non_iso
-from mp4.core import *
-from mp4.util import *
-from mp4.summary import *
+import mp4analyser.non_iso
+from mp4analyser.core import *
+from mp4analyser.util import *
+from mp4analyser.summary import *
 
 
 # Supported box
@@ -42,7 +42,7 @@ def box_factory(fp, header, parent):
         the_box = _box_class(fp, header, parent)
         return the_box
     else:
-        return mp4.non_iso.box_factory_non_iso(fp, header, parent)
+        return mp4analyser.non_iso.box_factory_non_iso(fp, header, parent)
 
 
 class Mp4File:

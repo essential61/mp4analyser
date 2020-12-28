@@ -8,9 +8,9 @@ https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFCha
 """
 import binascii
 
-import mp4.iso
-from mp4.util import *
-from mp4.core import *
+import mp4analyser.iso
+from mp4analyser.util import *
+from mp4analyser.core import *
 
 
 def box_factory_non_iso(fp, header, parent):
@@ -58,7 +58,7 @@ class Avc1Box(Mp4FullBox):
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
                 current_header = Header(fp)
-                current_box = mp4.iso.box_factory(fp, current_header, self)
+                current_box = mp4analyser.iso.box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
                 bytes_left -= current_box.size
         finally:
@@ -250,7 +250,7 @@ class Mp4aBox(Mp4Box):
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
                 current_header = Header(fp)
-                current_box = mp4.iso.box_factory(fp, current_header, self)
+                current_box = mp4analyser.iso.box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
                 bytes_left -= current_box.size
         finally:
@@ -435,7 +435,7 @@ class ItemBox(Mp4Box):
             bytes_left = self.size - self.header.header_size
             while bytes_left > 7:
                 current_header = Header(fp)
-                current_box = mp4.iso.box_factory(fp, current_header, self)
+                current_box = mp4analyser.iso.box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
                 bytes_left -= current_box.size
         finally:
