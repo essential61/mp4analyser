@@ -127,7 +127,8 @@ class Mp4File:
                 for mdat in mdats:
                     mdat_sample_list = [sample for sample in sample_list if
                                         mdat.start_of_box < sample['chunk_offset'] < (mdat.start_of_box + mdat.size)]
-                    mdat.box_info['sample_list'] = mdat_sample_list
+                    if len(mdat_sample_list):
+                        mdat.box_info['message'] = 'Has samples.'
                     mdat.sample_list = mdat_sample_list
 
     def _generate_samples_from_moofs(self):
