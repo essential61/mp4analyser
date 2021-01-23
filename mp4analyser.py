@@ -267,7 +267,7 @@ class MyApp(Tk):
 
     def select_sample_details(self, item_id):
         """ if tree item selected is a media sample """
-        idx_sample = int(item_id.split('.')[1])
+        idx_sample = int((item_id.split('.')[1]).split('_')[0])
         parent_id = self.tree.parent(item_id)
         idx_chunk = int(parent_id.split('_')[1])
         idx_mdat = int(self.tree.parent(parent_id))
@@ -322,11 +322,11 @@ class MyApp(Tk):
         for chunk_idx, chunk in enumerate(mdat.sample_list):
             if 'chunk_ID' in chunk:
                 item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
-                self.tree.insert(mdat_id, 'end', "chunk_{0}".format(chunk_idx), text=item_text)
+                self.tree.insert(mdat_id, 'end', "chunk_{0}_mdat_{1}".format(chunk_idx, mdat_id), text=item_text)
                 for sample_idx, sample in enumerate(chunk['chunk_samples']):
                     item_text = "sample {0}".format(sample['sample_ID'])
-                    self.tree.insert("chunk_{0}".format(chunk_idx), 'end',
-                                     "sample_{0}.{1}".format(chunk_idx, sample_idx), text=item_text)
+                    self.tree.insert("chunk_{0}_mdat_{1}".format(chunk_idx, mdat_id), 'end',
+                                     "sample_{0}.{1}_mdat_{2}".format(chunk_idx, sample_idx, mdat_id), text=item_text)
             else:  # fragmented mp4 uses term "run" instead of "chunk" but is otherwise same
                 item_text = "track {0}, seq {1}, run {2}".format(chunk['track_ID'], chunk['sequence_number'],
                                                                  chunk['run_ID'])

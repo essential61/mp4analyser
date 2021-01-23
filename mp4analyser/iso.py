@@ -70,7 +70,7 @@ class Mp4File:
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
-        mdats = sorted([mbox for mbox in self.child_boxes if mbox.type == 'mdat'], key=lambda k: k.size, reverse=True)
+        mdats = [mbox for mbox in self.child_boxes if mbox.type == 'mdat']
         # generate a sample list if there is a moov that contains traks N.B only ever 0,1 moov boxes
         if [box for box in self.child_boxes if box.type == 'moov']:
             moov = [box for box in self.child_boxes if box.type == 'moov'][0]
@@ -124,14 +124,11 @@ class Mp4File:
             if sample_list:
                 # sort by chunk offset to get interleaved list
                 sample_list.sort(key=lambda k: k['chunk_offset'])
-                # It's reasonable to assume samples will be located within largest mdat in the the file, but to be sure.
-                min_chunk_offset = sample_list[0]['chunk_offset']
-                max_chunk_offset = sample_list[-1]['chunk_offset']
                 for mdat in mdats:
-                    if mdat.start_of_box < min_chunk_offset and (mdat.start_of_box + mdat.size) > max_chunk_offset:
-                        mdat.box_info['message'] = 'Has samples.'
-                        mdat.sample_list = sample_list
-                        break
+                    mdat_sample_list = [sample for sample in sample_list if
+                                        mdat.start_of_box < sample['chunk_offset'] < (mdat.start_of_box + mdat.size)]
+                    mdat.box_info['sample_list'] = mdat_sample_list
+                    mdat.sample_list = mdat_sample_list
 
     def _generate_samples_from_moofs(self):
         """
