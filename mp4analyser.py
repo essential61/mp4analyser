@@ -252,7 +252,7 @@ class MyApp(Tk):
 
     def select_chunk_details(self, item_id):
         """ if tree item selected is a media chunk (or equivalent 'run' for fragmented mp4) """
-        idx_chunk = int(item_id.split('_')[1])
+        idx_chunk = int((item_id.split('_')[1]).split('_')[0])
         idx_mdat = int(self.tree.parent(item_id))
         chunk_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]
         self.populate_text_widget(json.dumps(chunk_dict, indent=2))
