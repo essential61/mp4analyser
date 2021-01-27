@@ -269,7 +269,7 @@ class MyApp(Tk):
         """ if tree item selected is a media sample """
         idx_sample = int((item_id.split('.')[1]).split('_')[0])
         parent_id = self.tree.parent(item_id)
-        idx_chunk = int(parent_id.split('_')[1])
+        idx_chunk = int((parent_id.split('_')[1]).split('_')[0])
         idx_mdat = int(self.tree.parent(parent_id))
         if 'chunk_samples' in self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]:
             sample_dict = self.mp4file.child_boxes[idx_mdat].sample_list[idx_chunk]['chunk_samples'][idx_sample]
