@@ -14,7 +14,7 @@ It should work on any platform that can run a Python interpreter and support TKi
 Use the latest version of Python (3.7+). Depending on the Python distribution for your platform, you may also need to install idle3.
 
 # Status #
-Version 1.0 released. Will consider pull requests.
+Version 1.1 released. Will consider pull requests.
 
 ## TODO: ##
 * Keep adding boxes.
