@@ -47,7 +47,7 @@ def box_factory(fp, header, parent):
 
 class Mp4File:
     """ Mp4File Class, effectively the top-level container """
-    def __init__(self, filename):
+    def __init__(self, filename, *, generate_samples=True):
         self.filename = filename
         self.type = 'file'
         self.child_boxes = []
@@ -65,8 +65,9 @@ class Mp4File:
                 else:
                     f.seek(-4, 1)
         f.close()
-        self._generate_samples_from_moov()
-        self._generate_samples_from_moofs()
+        if generate_samples:
+            self._generate_samples_from_moov()
+            self._generate_samples_from_moofs()
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
