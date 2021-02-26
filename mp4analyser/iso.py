@@ -209,7 +209,7 @@ class FreeBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-SkipBox = FreeBox
+class SkipBox(FreeBox): pass
 
 
 class FtypBox(Mp4Box):
@@ -230,7 +230,7 @@ class FtypBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-StypBox = FtypBox
+class StypBox(FtypBox): pass
 
 
 class PdinBox(Mp4FullBox):
@@ -262,9 +262,26 @@ class ContainerBox(Mp4Box):
 
 
 # All these are pure container boxes
-DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
-UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
-GmhdBox = ContainerBox
+class DinfBox(ContainerBox): pass
+class MinfBox(ContainerBox): pass
+class MdiaBox(ContainerBox): pass
+class TrefBox(ContainerBox): pass
+class EdtsBox(ContainerBox): pass
+class TrafBox(ContainerBox): pass
+class TrakBox(ContainerBox): pass
+class MoofBox(ContainerBox): pass
+class MoovBox(ContainerBox): pass
+class UdtaBox(ContainerBox): pass
+class TrgrBox(ContainerBox): pass
+class MvexBox(ContainerBox): pass
+class MfraBox(ContainerBox): pass
+class StrkBox(ContainerBox): pass
+class StrdBox(ContainerBox): pass
+class RinfBox(ContainerBox): pass
+class SinfBox(ContainerBox): pass
+class MecoBox(ContainerBox): pass
+class GmdhBox(ContainerBox): pass
+
 
 class MetaBox(Mp4Box):
     """

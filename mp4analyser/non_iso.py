@@ -65,9 +65,16 @@ class Avc1Box(Mp4FullBox):
             fp.seek(self.start_of_box + self.size)
 
 
-DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
-Hvc1Box = Hev1Box = Av01Box = Avc1Box
-Avc4Box = Avc3Box = Avc2Box = Avc1Box
+class DvheBox(Avc1Box): pass
+class Dvh1Box(Avc1Box): pass
+class DvavBox(Avc1Box): pass
+class Dva1Box(Avc1Box): pass
+class Hvc1Box(Avc1Box): pass
+class Hev1Box(Avc1Box): pass
+class Av01Box(Avc1Box): pass
+class Avc2Box(Avc1Box): pass
+class Avc3Box(Avc1Box): pass
+class Avc4Box(Avc1Box): pass
 
 
 class AvccBox(Mp4Box):
@@ -206,7 +213,8 @@ class DvccBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-DvvcBox = DvccBox
+class DvvcBox(DvccBox): pass
+
 
 class BtrtBox(Mp4Box):
 
@@ -257,7 +265,8 @@ class Mp4aBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-Ac_3Box = Ec_3Box = Mp4aBox
+class Ac_3Box(Mp4aBox): pass
+class Ec_3Box(Mp4aBox): pass
 
 
 class EsdsBox(Mp4FullBox):
