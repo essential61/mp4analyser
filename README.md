@@ -11,7 +11,9 @@ It should work on any platform that can run a Python interpreter and support TKi
 ![alt text](./images/mp4analyser.png)
 
 # Pre-Requisites #
-Use the latest version of Python (3.7+). Depending on the Python distribution for your platform, you may also need to install idle3.
+Use the latest version of Python (3.7+). Depending on the Python distribution for your platform, you may also need to install idle3. 
+
+If you are using a Mac, you should read this concerning TkInter: https://www.python.org/download/mac/tcltk/
 
 # Status #
 Version 1.1 released. Will consider pull requests.
