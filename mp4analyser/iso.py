@@ -724,22 +724,14 @@ class TrunBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['sample_count'] = read_u32(fp)
-            has_sample_duration = False
-            has_sample_size = False
-            has_sample_flags = False
-            has_scto = False
             if int(self.box_info['flags'][-1], 16) & 1 == 1:
                 self.box_info['data_offset'] = read_i32(fp)
             if int(self.box_info['flags'][-1], 16) & 4 == 4:
                 self.box_info['first_sample_flags'] = "{0:#08x}".format(read_u32(fp))
-            if int(self.box_info['flags'][-3], 16) & 1 == 1:
-                has_sample_duration = True
-            if int(self.box_info['flags'][-3], 16) & 2 == 2:
-                has_sample_size = True
-            if int(self.box_info['flags'][-3], 16) & 4 == 4:
-                has_sample_flags = True
-            if int(self.box_info['flags'][-3], 16) & 8 == 8:
-                has_scto = True
+            has_sample_duration = True if int(self.box_info['flags'][-3], 16) & 1 == 1 else False
+            has_sample_size = True if int(self.box_info['flags'][-3], 16) & 2 == 2 else False
+            has_sample_flags = True if int(self.box_info['flags'][-3], 16) & 4 == 4 else False
+            has_scto = True if int(self.box_info['flags'][-3], 16) & 8 == 8 else False
             sample_list = []
             for i in range(self.box_info['sample_count']):
                 sample = {}

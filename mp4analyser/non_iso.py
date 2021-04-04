@@ -9,6 +9,7 @@ https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFCha
 import binascii
 
 import mp4analyser.iso
+import mp4analyser.mpeglookups
 from mp4analyser.util import *
 from mp4analyser.core import *
 
@@ -265,8 +266,87 @@ class EsdsBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            self.box_info['elementary_stream_descriptor'] = \
-                binascii.b2a_hex(fp.read(self.size - (self.header.header_size + 4))).decode('utf-8')
+            #self.box_info['elementary_stream_descriptor'] = \
+            #    binascii.b2a_hex(fp.read(self.size - (self.header.header_size + 4))).decode('utf-8')
+            object_dict = {}
+            object_dict['tag_id'] = read_u8(fp)
+            padding = 0x0
+            while read_u8(fp) == 0x80:
+                padding = (padding << 8) + 0x80
+            object_dict['preamble'] = hex(padding)
+            # read last byte
+            fp.seek(-1, 1)
+            object_dict['payload_length'] = read_u8(fp)
+            object_dict['es_id'] = read_u16(fp)
+            object_dict['descriptor_flags'] = read_u8(fp)
+            object_dict['descriptor_loop'] = []
+            # descriptor loop
+            while fp.tell() < (self.start_of_box + self.size):
+                this_descriptor_dict = {'tag_id': read_u8(fp)}
+                padding = 0x0
+                while read_u8(fp) == 0x80:
+                    padding = (padding << 8) + 0x80
+                this_descriptor_dict['preamble'] = hex(padding)
+                # read last byte
+                fp.seek(-1, 1)
+                this_descriptor_dict['payload_length'] = read_u8(fp)
+                payload = fp.read(this_descriptor_dict['payload_length'])
+                if this_descriptor_dict['tag_id'] == 4:
+                    # it is the elementary stream descriptor
+                    mp4ra_type = int.from_bytes(payload[0:1], byteorder='big')
+                    this_descriptor_dict['registered_type'] = mp4analyser.mpeglookups.mp4ra_table[mp4ra_type] \
+                        if mp4ra_type in mp4analyser.mpeglookups.mp4ra_table else mp4ra_type
+                    type_byte = int.from_bytes(payload[1:2], byteorder='big')
+                    es_type = type_byte >> 2
+                    this_descriptor_dict['es_type'] = mp4analyser.mpeglookups.es_table[es_type] \
+                        if es_type in mp4analyser.mpeglookups.es_table else es_type
+                    this_descriptor_dict['upstream_flag'] = type_byte & 2
+                    this_descriptor_dict['specific_info_flag'] = type_byte & 1
+                    this_descriptor_dict['buffer_size'] = int.from_bytes(payload[2:5], byteorder='big')
+                    this_descriptor_dict['max_bitrate'] = int.from_bytes(payload[5:9], byteorder='big')
+                    this_descriptor_dict['avg_bitrate'] = int.from_bytes(payload[9:13], byteorder='big')
+                    if this_descriptor_dict['specific_info_flag']:
+                        # decoder-specific descriptor embedded in es descriptor
+                        decoder_specific_dict = {'tag_id': int.from_bytes(payload[13:14], byteorder='big')}
+                        padding = 0x0
+                        b = 14
+                        while int.from_bytes(payload[b:b+1], byteorder='big') == 0x80:
+                            padding = (padding << 8) + 0x80
+                            b += 1
+                        decoder_specific_dict['preamble'] = hex(padding)
+                        decoder_specific_dict['payload_length'] = int.from_bytes(payload[b:b+1], byteorder='big')
+                        two_bytes = int.from_bytes(payload[b+1:b+3], byteorder='big')
+                        field_size = 5
+                        sound_codec= two_bytes >> (16 - field_size)
+                        bits_read = field_size
+                        if sound_codec == 31:
+                            field_size = 6
+                            sound_codec = ((two_bytes >> (16 - bits_read - field_size)) & 63) + 32
+                            bits_read += field_size
+                        decoder_specific_dict['sound_codec'] = mp4analyser.mpeglookups.sound_codec_table[sound_codec]
+                        field_size = 4
+                        decoder_specific_dict['freq_id'] = mp4analyser.mpeglookups.freq_table[
+                            (two_bytes >> (16 - bits_read - field_size)) & 15]
+                        bits_read += field_size
+                        if decoder_specific_dict['freq_id'] == 15:
+                            # we need to read freq directly, the bit-packing makes this a bit cumbersome
+                            four_bytes = int.from_bytes(payload[b+2:b+6], byteorder='big')
+                            field_size = 24
+                            # subtract 8 from bits_read because we are not including first byte in payload
+                            bits_read -= 8
+                            decoder_specific_dict['freq_value'] = four_bytes >> (32 - bits_read - field_size) & 16777215
+                            # adjust to two_bytes
+                            bits_read += field_size - 16
+                            two_bytes = int.from_bytes(payload[b+4:b+6], byteorder='big')
+                        field_size = 4
+                        sound_chan = (two_bytes >> (16 - bits_read - field_size)) & 15
+                        decoder_specific_dict['channels'] = mp4analyser.mpeglookups.sound_channel_table[sound_chan] \
+                            if sound_chan in mp4analyser.mpeglookups.sound_channel_table else sound_chan
+                        this_descriptor_dict['decoder_specific_descriptor'] = decoder_specific_dict
+                else:
+                    this_descriptor_dict['payload'] = binascii.b2a_hex(payload).decode('utf-8')
+                object_dict['descriptor_loop'].append(this_descriptor_dict)
+            self.box_info['object_descriptor'] = object_dict
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -282,7 +362,7 @@ class Dac3Box(Mp4Box):
             self.box_info['bsmod'] = my_data >> 14 & 7
             self.box_info['acmod'] = my_data >> 11 & 7
             self.box_info['lfeon'] = my_data >> 10 & 1
-            self.box_info['bit_rate_code'] = my_data >> 5 % 31
+            self.box_info['bit_rate_code'] = my_data >> 5 & 31
         finally:
             fp.seek(self.start_of_box + self.size)
 
