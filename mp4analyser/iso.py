@@ -172,12 +172,19 @@ class Mp4File:
                                     'sample_count': trun.box_info['sample_count'],
                                     'run_samples': []
                                     }
+                        has_sample_size = False
+                        if int(trun.box_info['flags'][-3], 16) & 2 == 2:
+                            has_sample_size = True
                         for l, sample in enumerate(trun.box_info['samples'], 1):
+                            if not has_sample_size:
+                                sample_size = tfhd.box_info['default_sample_size']
+                            else:
+                                sample_size = sample['sample_size']
                             run_dict['run_samples'].append({'sample_ID': l,
-                                                            'size': sample['sample_size'],
+                                                            'size': sample_size,
                                                             'offset': data_offset
                                                             })
-                            data_offset += sample['sample_size']
+                            data_offset += sample_size
                         for mdat in media_segment['mdat_boxes']:
                             if mdat.start_of_box < run_dict['run_offset'] and (mdat.start_of_box
                                                                                + mdat.size) >= data_offset:
