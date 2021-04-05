@@ -172,9 +172,7 @@ class Mp4File:
                                     'sample_count': trun.box_info['sample_count'],
                                     'run_samples': []
                                     }
-                        has_sample_size = False
-                        if int(trun.box_info['flags'][-3], 16) & 2 == 2:
-                            has_sample_size = True
+                        has_sample_size = True if int(trun.box_info['flags'][-3], 16) & 2 == 2 else False
                         for l, sample in enumerate(trun.box_info['samples'], 1):
                             if not has_sample_size:
                                 sample_size = tfhd.box_info['default_sample_size']
