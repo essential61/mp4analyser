@@ -68,7 +68,7 @@ class Avc1Box(Mp4FullBox):
 
 DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
 Hvc1Box = Hev1Box = Av01Box = Avc1Box
-Avc4Box = Avc3Box = Avc2Box = Avc1Box
+Avc4Box = Avc3Box = Avc2Box = Mp4vBox = Avc1Box
 
 
 class AvccBox(Mp4Box):
@@ -294,7 +294,7 @@ class EsdsBox(Mp4FullBox):
                 if this_descriptor_dict['tag_id'] == 4:
                     # it is the elementary stream descriptor
                     mp4ra_type = int.from_bytes(payload[0:1], byteorder='big')
-                    this_descriptor_dict['registered_type'] = mp4analyser.mpeglookups.mp4ra_table[mp4ra_type] \
+                    this_descriptor_dict['mp4ra_registered_type'] = mp4analyser.mpeglookups.mp4ra_table[mp4ra_type] \
                         if mp4ra_type in mp4analyser.mpeglookups.mp4ra_table else mp4ra_type
                     type_byte = int.from_bytes(payload[1:2], byteorder='big')
                     es_type = type_byte >> 2
@@ -315,33 +315,36 @@ class EsdsBox(Mp4FullBox):
                             b += 1
                         decoder_specific_dict['preamble'] = hex(padding)
                         decoder_specific_dict['payload_length'] = int.from_bytes(payload[b:b+1], byteorder='big')
-                        two_bytes = int.from_bytes(payload[b+1:b+3], byteorder='big')
-                        field_size = 5
-                        sound_codec= two_bytes >> (16 - field_size)
-                        bits_read = field_size
-                        if sound_codec == 31:
-                            field_size = 6
-                            sound_codec = ((two_bytes >> (16 - bits_read - field_size)) & 63) + 32
+                        if es_type == 5:
+                            two_bytes = int.from_bytes(payload[b+1:b+3], byteorder='big')
+                            field_size = 5
+                            sound_codec= two_bytes >> (16 - field_size)
+                            bits_read = field_size
+                            if sound_codec == 31:
+                                field_size = 6
+                                sound_codec = ((two_bytes >> (16 - bits_read - field_size)) & 63) + 32
+                                bits_read += field_size
+                            decoder_specific_dict['sound_codec'] = mp4analyser.mpeglookups.sound_codec_table[sound_codec]
+                            field_size = 4
+                            decoder_specific_dict['freq_id'] = mp4analyser.mpeglookups.freq_table[
+                                (two_bytes >> (16 - bits_read - field_size)) & 15]
                             bits_read += field_size
-                        decoder_specific_dict['sound_codec'] = mp4analyser.mpeglookups.sound_codec_table[sound_codec]
-                        field_size = 4
-                        decoder_specific_dict['freq_id'] = mp4analyser.mpeglookups.freq_table[
-                            (two_bytes >> (16 - bits_read - field_size)) & 15]
-                        bits_read += field_size
-                        if decoder_specific_dict['freq_id'] == 15:
-                            # we need to read freq directly, the bit-packing makes this a bit cumbersome
-                            four_bytes = int.from_bytes(payload[b+2:b+6], byteorder='big')
-                            field_size = 24
-                            # subtract 8 from bits_read because we are not including first byte in payload
-                            bits_read -= 8
-                            decoder_specific_dict['freq_value'] = four_bytes >> (32 - bits_read - field_size) & 16777215
-                            # adjust to two_bytes
-                            bits_read += field_size - 16
-                            two_bytes = int.from_bytes(payload[b+4:b+6], byteorder='big')
-                        field_size = 4
-                        sound_chan = (two_bytes >> (16 - bits_read - field_size)) & 15
-                        decoder_specific_dict['channels'] = mp4analyser.mpeglookups.sound_channel_table[sound_chan] \
-                            if sound_chan in mp4analyser.mpeglookups.sound_channel_table else sound_chan
+                            if decoder_specific_dict['freq_id'] == 15:
+                                # we need to read freq directly, the bit-packing makes this a bit cumbersome
+                                four_bytes = int.from_bytes(payload[b+2:b+6], byteorder='big')
+                                field_size = 24
+                                # subtract 8 from bits_read because we are not including first byte in payload
+                                bits_read -= 8
+                                decoder_specific_dict['freq_value'] = four_bytes >> (32 - bits_read - field_size) & 16777215
+                                # adjust to two_bytes
+                                bits_read += field_size - 16
+                                two_bytes = int.from_bytes(payload[b+4:b+6], byteorder='big')
+                            field_size = 4
+                            sound_chan = (two_bytes >> (16 - bits_read - field_size)) & 15
+                            decoder_specific_dict['channels'] = mp4analyser.mpeglookups.sound_channel_table[sound_chan] \
+                                if sound_chan in mp4analyser.mpeglookups.sound_channel_table else sound_chan
+                        else:
+                            decoder_specific_dict['payload'] = binascii.b2a_hex(payload[b+1:]).decode('utf-8')
                         this_descriptor_dict['decoder_specific_descriptor'] = decoder_specific_dict
                 else:
                     this_descriptor_dict['payload'] = binascii.b2a_hex(payload).decode('utf-8')

@@ -57,15 +57,17 @@ class Summary:
                 if media == 'vide':
                     this_trak['media_type'] = 'video'
                     this_trak['codec_type'] = codec_info.type
-                    this_trak['width'] = codec_info.box_info['width']
-                    this_trak['height'] = codec_info.box_info['height']
+                    this_trak['width'] = codec_info.box_info['width'] if 'width' in codec_info.box_info else "unknown"
+                    this_trak['height'] = codec_info.box_info['height'] if 'height' in codec_info.box_info else "unknown"
                     if sample_rate is not None:
                         this_trak['frame_rate'] = sample_rate
                 elif media == 'soun':
                     this_trak['media_type'] = 'audio'
                     this_trak['codec_type'] = codec_info.type
-                    this_trak['channel_count'] = codec_info.box_info['audio_channel_count']
-                    this_trak['sample_rate'] = codec_info.box_info['audio_sample_rate']
+                    this_trak['channel_count'] = codec_info.box_info['audio_channel_count'] \
+                        if 'audio_channel_count' in codec_info.box_info else "unknown"
+                    this_trak['sample_rate'] = codec_info.box_info['audio_sample_rate'] \
+                        if 'sample_rate' in codec_info.box_info else "unknown"
                 else:
                     this_trak['media_type'] = media
                     this_trak['codec_type'] = codec_info.type
