@@ -67,7 +67,7 @@ class Summary:
                     this_trak['channel_count'] = codec_info.box_info['audio_channel_count'] \
                         if 'audio_channel_count' in codec_info.box_info else "unknown"
                     this_trak['sample_rate'] = codec_info.box_info['audio_sample_rate'] \
-                        if 'sample_rate' in codec_info.box_info else "unknown"
+                        if 'audio_sample_rate' in codec_info.box_info else "unknown"
                 else:
                     this_trak['media_type'] = media
                     this_trak['codec_type'] = codec_info.type
