@@ -68,7 +68,8 @@ class MyApp(Tk):
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
-        # This code is to get monitor size as winfo_screenwidth() may not be useful in multi-monitor env
+        # This code is to get monitor size as winfo_screenwidth() may not be useful in multi-monitor env.
+        # Does cause a flicker though
         t = Tk()  # new temp window
         t.attributes('-fullscreen', True)  # maximize the window
         t.update()
