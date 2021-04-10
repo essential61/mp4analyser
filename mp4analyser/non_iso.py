@@ -274,7 +274,7 @@ class EsdsBox(Mp4FullBox):
             while read_u8(fp) == 0x80:
                 padding = (padding << 8) + 0x80
             object_dict['preamble'] = hex(padding)
-            # read last byte
+            # read last-read byte again
             fp.seek(-1, 1)
             object_dict['payload_length'] = read_u8(fp)
             object_dict['es_id'] = read_u16(fp)
@@ -521,5 +521,32 @@ class ItemBox(Mp4Box):
                 current_box = mp4analyser.iso.box_factory(fp, current_header, self)
                 self.child_boxes.append(current_box)
                 bytes_left -= current_box.size
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class IodsBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            object_dict = {}
+            object_dict['tag_id'] = read_u8(fp)
+            padding = 0x0
+            while read_u8(fp) == 0x80:
+                padding = (padding << 8) + 0x80
+            object_dict['preamble'] = hex(padding)
+            # read last-read byte again
+            fp.seek(-1, 1)
+            object_dict['payload_length'] = read_u8(fp)
+            object_dict['od_id'] = read_u16(fp)
+            object_dict['od_profile_level'] = read_u8(fp)
+            object_dict['scene_profile_level'] = read_u8(fp)
+            object_dict['audio_profile_level'] = read_u8(fp)
+            object_dict['video_profile_level'] = read_u8(fp)
+            object_dict['graphics_profile_level'] = read_u8(fp)
+            # unsure if further optional tags can exist
+            self.box_info['initial_object_descriptor'] = object_dict
+            #self.box_info['message'] = 'TODO'
         finally:
             fp.seek(self.start_of_box + self.size)
