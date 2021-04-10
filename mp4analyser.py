@@ -68,7 +68,15 @@ class MyApp(Tk):
         self.title("MP4 Analyser")
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
-        self.geometry('1300x700')
+        # This code is to get monitor size as winfo_screenwidth() may not be useful in multi-monitor env.
+        # Does cause a flicker though
+        t = Tk()  # new temp window
+        t.attributes('-fullscreen', True)  # maximize the window
+        t.update()
+        width = int(t.winfo_width() * 0.75)
+        height = int(t.winfo_height() * 0.75)
+        t.destroy()
+        self.geometry(f'{width}x{height}')
 
         # create tabbed notebook
         self.nb = ttk.Notebook(self)
@@ -177,6 +185,11 @@ class MyApp(Tk):
         self.statustext.set("")
         self.status = Label(self, textvariable=self.statustext, bd=1, anchor=W)
         self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
+
+        # set ratios of panes
+        self.update_idletasks()
+        self.p.sashpos(0, int(self.p.winfo_width() / 4))
+        self.p1.sashpos(0, int(3 * self.p1.winfo_height() / 4))
 
     def open_file(self):
         """ Callback on selecting 'Open' from menu """

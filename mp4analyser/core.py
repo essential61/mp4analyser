@@ -87,7 +87,8 @@ class Header:
         self.header_size = fp.tell() - start_of_box
         # throw error if size < 8 as 8 bytes is smallest box (free, skip etc)
         if self.size < 8:
-            raise Exception('box size should be at least 8 bytes. The value of size was: {}'.format(self.size))
+            raise Exception('box size {} should be at least 8 bytes.'
+                            ' The value of size was: {}'.format(self.type, self.size))
 
     @property
     def size(self):
