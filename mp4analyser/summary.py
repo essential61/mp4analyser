@@ -12,8 +12,9 @@ class Summary:
         self.data = {}
         self.data['filename'] = mp4file.filename
         self.data['filesize (bytes)'] = os.path.getsize(mp4file.filename)
-        fstyp = [box for box in boxes if box.type == 'ftyp' or box.type == 'styp'][0]
-        self.data['brand'] = fstyp.box_info['major_brand']
+        if [box for box in boxes if box.type == 'ftyp' or box.type == 'styp']:
+            fstyp = [box for box in boxes if box.type == 'ftyp' or box.type == 'styp'][0]
+            self.data['brand'] = fstyp.box_info['major_brand']
         # check if there is a moov and if there is a moov that contains traks N.B only ever 0,1 moov boxes
         if [box for box in boxes if box.type == 'moov']:
             moov = [box for box in boxes if box.type == 'moov'][0]

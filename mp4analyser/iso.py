@@ -415,21 +415,21 @@ class TfhdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['track_id'] = read_u32(fp)
-            if int(self.box_info['flags'][-1]) & 1 == 1:
+            if int(self.box_info['flags'][-1], 16)  & 1 == 1:
                 self.box_info['base_data_offset'] = read_u64(fp)
-            if int(self.box_info['flags'][-1]) & 2 == 2:
+            if int(self.box_info['flags'][-1], 16) & 2 == 2:
                 self.box_info['sample_description_index'] = read_u32(fp)
-            if int(self.box_info['flags'][-1]) & 8 == 8:
+            if int(self.box_info['flags'][-1], 16) & 8 == 8:
                 self.box_info['default_sample_duration'] = read_u32(fp)
-            if int(self.box_info['flags'][-2]) & 1 == 1:
+            if int(self.box_info['flags'][-2], 16) & 1 == 1:
                 self.box_info['default_sample_size'] = read_u32(fp)
-            if int(self.box_info['flags'][-2]) & 2 == 2:
+            if int(self.box_info['flags'][-2], 16) & 2 == 2:
                 self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
-            if int(self.box_info['flags'][-5]) & 1 == 1:
+            if int(self.box_info['flags'][-5], 16) & 1 == 1:
                 self.box_info['duration_is_empty'] = True
             else:
                 self.box_info['duration_is_empty'] = False
-            if int(self.box_info['flags'][-5]) & 2 == 2:
+            if int(self.box_info['flags'][-5], 16) & 2 == 2:
                 self.box_info['default_base_is_moof'] = True
             else:
                 self.box_info['default_base_is_moof'] = False
