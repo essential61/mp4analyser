@@ -55,6 +55,16 @@ class Mp4Box:
         offset = self.start_of_box - top_box.start_of_box
         return top_box.byte_string[offset:offset + self.size]
 
+    def search_child_boxes_for_type(self, box_type):
+        type_matches = []
+        for box in self.child_boxes:
+            if box.type == box_type:
+                # append object onto array
+                type_matches.append(box)
+            if box.child_boxes:
+                # add array onto array
+                type_matches += box.search_child_boxes_for_type(box_type)
+        return type_matches
 
 class Mp4FullBox(Mp4Box):
     """ Derived from Mp4Box, but with version and flags.  """

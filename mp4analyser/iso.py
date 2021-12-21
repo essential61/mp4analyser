@@ -201,6 +201,15 @@ class Mp4File:
         if not self.summary:
             self.summary = Summary(self)
         return self.summary.data
+
+    def search_boxes_for_type(self, box_type):
+        type_matches = []
+        for box in self.child_boxes:
+            if box.type == box_type:
+                type_matches.append(box)
+            if box.child_boxes:
+                type_matches += box.search_child_boxes_for_type(box_type)
+        return type_matches
 # Box classes
 
 
@@ -269,7 +278,7 @@ class ContainerBox(Mp4Box):
 # All these are pure container boxes
 DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
-GmhdBox = ContainerBox
+GmhdBox = SchiBox = ContainerBox
 
 class MetaBox(Mp4Box):
     """
@@ -866,19 +875,12 @@ class HdlrBox(Mp4FullBox):
             fp.seek(self.start_of_box + self.size)
 
 
-class StblBox(Mp4Box):
+class StblBox(ContainerBox):
 
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            bytes_left = self.size - self.header.header_size
-            while bytes_left > 7:
-                saved_file_position = fp.tell()
-                current_header = Header(fp)
-                current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
-                fp.seek(saved_file_position + current_box.size)
-                bytes_left -= current_box.size
+            # Some sample table boxes have dependencies on other sample table table boxes
             # fill stdp list using sample count in stsz
             sc = None
             stdp_ord = None

@@ -69,6 +69,7 @@ class Avc1Box(Mp4FullBox):
 DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
 Hvc1Box = Hev1Box = Av01Box = Avc1Box
 Avc4Box = Avc3Box = Avc2Box = Mp4vBox = Avc1Box
+EncvBox = Avc1Box
 
 
 class AvccBox(Mp4Box):
@@ -422,6 +423,26 @@ class PsshBox(Mp4FullBox):
                 self.box_info['key_list'] = []
                 for i in range(self.box_info['key_count']):
                     self.box_info['key_list'].append(binascii.b2a_hex(fp.read(16)).decode('utf-8'))
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class TencBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['reserved'] = read_u8(fp)
+            byte_block = read_u8(fp)
+            if self.box_info['version'] == 1:
+                self.box_info['default_crypt_byte_block'] = byte_block >> 4
+                self.box_info['default_skip_byte_block'] = byte_block & 15
+            self.box_info['default_isProtected'] = read_u8(fp)
+            self.box_info['default_Per_Sample_IV_Size'] = read_u8(fp)
+            self.box_info['default_KID'] = binascii.b2a_hex(fp.read(16)).decode('utf-8')
+            if self.box_info['default_isProtected'] == 1 and self.box_info['default_Per_Sample_IV_Size'] == 0:
+                self.box_info['default_constant_IV_size'] = read_u8(fp)
+                self.box_info['default_constant_IV'] = binascii.b2a_hex(fp.read(self.box_info['default_constant_IV_size'])).decode('utf-8')
         finally:
             fp.seek(self.start_of_box + self.size)
 

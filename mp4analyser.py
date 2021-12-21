@@ -244,6 +244,23 @@ class MyApp(Tk):
                                                                                           l7)
                                         self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
                                                          open=TRUE)
+                                        for l8, this_box in enumerate(this_box.child_boxes):
+                                            l8_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}".format(l0, l1, l2, l3, l4, l5,
+                                                                                              l6,
+                                                                                              l7,
+                                                                                              l8)
+                                            self.tree.insert(l7_iid, 'end', l8_iid, text=l8_iid + " " + this_box.type,
+                                                             open=TRUE)
+                                            for l9, this_box in enumerate(this_box.child_boxes):
+                                                l9_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}.{9}".format(l0, l1, l2, l3,
+                                                                                                      l4, l5,
+                                                                                                      l6,
+                                                                                                      l7,
+                                                                                                      l8,
+                                                                                                      l9)
+                                                self.tree.insert(l8_iid, 'end', l9_iid,
+                                                                 text=l9_iid + " " + this_box.type,
+                                                                 open=TRUE)
         logging.debug("Summary " + json.dumps(self.mp4file.get_summary(), indent=2))
         logging.debug("Finished populating " + filename)
         self.statustext.set("")
@@ -321,6 +338,13 @@ class MyApp(Tk):
         elif len(l) == 8:
             box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
                 l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]]
+        elif len(l) == 9:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]].child_boxes[l[8]]
+        elif len(l) == 10:
+            box_selected = self.mp4file.child_boxes[l[0]].child_boxes[l[1]].child_boxes[l[2]].child_boxes[
+                l[3]].child_boxes[l[4]].child_boxes[l[5]].child_boxes[l[6]].child_boxes[l[7]].child_boxes[
+                l[8]].child_boxes[l[9]]
         logging.debug("Populating text widgets")
         self.prepare_string_for_text_widget(box_selected)
         logging.debug("Upper text widget populated")
