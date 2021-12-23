@@ -247,6 +247,21 @@ class FtypBox(Mp4Box):
 StypBox = FtypBox
 
 
+class ColrBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['color_type'] = fp.read(4).decode('utf-8')
+            if self.box_info['color_type'] == 'nclx':
+                self.box_info['color_primaries'] = read_u16(fp)
+                self.box_info['transfer_characteristics'] = read_u16(fp)
+                self.box_info['matrix_coefficients'] = read_u16(fp)
+                self.box_info['full_range_flag'] = read_u8(fp) >> 7
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
 class PdinBox(Mp4FullBox):
 
     def __init__(self, fp, header, parent):
@@ -276,9 +291,10 @@ class ContainerBox(Mp4Box):
 
 
 # All these are pure container boxes
-DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrafBox = TrakBox = MoofBox = MoovBox = ContainerBox
+DinfBox = MinfBox = MdiaBox = TrefBox = EdtsBox = TrakBox = MoofBox = MoovBox = ContainerBox
 UdtaBox = TrgrBox = MvexBox = MfraBox = StrkBox = StrdBox = RinfBox = SinfBox = MecoBox = ContainerBox
 GmhdBox = SchiBox = ContainerBox
+
 
 class MetaBox(Mp4Box):
     """
@@ -876,32 +892,43 @@ class HdlrBox(Mp4FullBox):
 
 
 class StblBox(ContainerBox):
-
+    # Sub-class from container box so we can do some extra things with child boxes
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            # Some sample table boxes have dependencies on other sample table table boxes
-            # fill stdp list using sample count in stsz
-            sc = None
-            stdp_ord = None
-            sdtp_ord = None
-            for i, this_child in enumerate(self.child_boxes):
-                if this_child.type == 'stsz' or this_child.type == 'stz2':
-                    sc = this_child.box_info['sample_count']
-                    if stdp_ord is not None and sdtp_ord is not None:
-                        break
-                if this_child.type == 'sdtp':
-                    sdtp_ord = i
-                    if sc is not None and stdp_ord is not None:
-                        break
-                if this_child.type == 'stdp':
-                    stdp_ord = i
-                    if sc is not None and sdtp_ord is not None:
-                        break
-            if sdtp_ord is not None:
-                self.child_boxes[sdtp_ord].update_table(fp, sc)
-            if stdp_ord is not None:
-                self.child_boxes[stdp_ord].update_table(fp, sc)
+            # Some sample table boxes have dependencies on other sample table table boxes in order to read correctly
+            # Fill stdp, sdtp lists using sample count in stsz
+            sz = [box for box in self.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0] if [
+                box for box in self.child_boxes if box.type == 'stsz' or box.type == 'stz2'] else False
+            sc = sz.box_info['sample_count'] if sz else False
+            sdtp = [box for box in self.child_boxes if box.type == 'sdtp'][0] if [
+                box for box in self.child_boxes if box.type == 'sdtp'] else False
+            stdp = [box for box in self.child_boxes if box.type == 'stdp'][0] if [
+                box for box in self.child_boxes if box.type == 'stdp'] else False
+            if sc and sdtp:
+                sdtp.update_table(fp, sc)
+            if sc and stdp:
+                stdp.update_table(fp, sc)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class TrafBox(ContainerBox):
+    # Sub-class from container box so we can do some extra things with child boxes
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            # if we have a senc box
+            senc = [box for box in self.child_boxes if box.type == 'senc'][0] if [
+                box for box in self.child_boxes if box.type == 'senc'] else False
+            if senc:
+                # check if it has sub-sampling before getting IV_size from sgpd
+                if int(senc.box_info['flags'][-1], 16) & 2:
+                    sgpd = [box for box in self.child_boxes if box.type == 'sgpd'][0] if [
+                        box for box in self.child_boxes if box.type == 'sgpd'] else False
+                    if sgpd.box_info['grouping_type'] == 'seig':
+                        # I've only ever seen a single entry in seig so get IV size from this
+                        senc.populate_sample_table(fp, sgpd.box_info['entry_list'][0]['per_sample_iv_size'])
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1173,7 +1200,18 @@ class SgpdBox(Mp4FullBox):
                 else:
                     description_length = self.box_info['default_length']
                 sample_group_entry = binascii.b2a_hex(fp.read(description_length)).decode('utf-8')
-                self.box_info['entry_list'].append({'sample_group_entry': sample_group_entry})
+                if self.box_info['grouping_type'] == 'seig':
+                    seig_dict = {'crypto_byte_block': int(sample_group_entry[2], 16),
+                                                            'skip_byte_block': int(sample_group_entry[3], 16),
+                                                            'is_encrypted': int(sample_group_entry[5], 16),
+                                                            'per_sample_iv_size': int(sample_group_entry[6:8], 16),
+                                                            'kid': sample_group_entry[8:40]}
+                    if seig_dict['is_encrypted'] == 1 and seig_dict['per_sample_iv_size'] == 0:
+                        seig_dict['constant_IV_size'] = sample_group_entry[40:42]
+                        seig_dict['constant_IV'] = sample_group_entry[42:]
+                    self.box_info['entry_list'].append(seig_dict)
+                else:
+                    self.box_info['entry_list'].append({'sample_group_entry': sample_group_entry})
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -1360,3 +1398,5 @@ class PrftBox(Mp4FullBox):
                 self.box_info['media_time'] = read_u64(fp)
         finally:
             fp.seek(self.start_of_box + self.size)
+
+

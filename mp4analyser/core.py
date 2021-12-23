@@ -87,9 +87,9 @@ class Header:
         self._size = read_u32(fp)
         my_4bytes = fp.read(4)
         if (struct.unpack('>I', my_4bytes)[0]) >> 24 == 169:
-            self.type = my_4bytes[1:].decode('utf-8')
+            self.type = my_4bytes[1:].decode('utf-8', errors='ignore')
         else:
-            self.type = my_4bytes.decode('utf-8')
+            self.type = my_4bytes.decode('utf-8', errors='ignore')
         if self._size == 1:
             self._largesize = read_u64(fp)
         if self.type == 'uuid':

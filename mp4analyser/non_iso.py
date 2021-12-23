@@ -259,7 +259,7 @@ class Mp4aBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-Ac_3Box = Ec_3Box = Mp4aBox
+Ac_3Box = Ec_3Box = EncaBox = Mp4aBox
 
 
 class EsdsBox(Mp4FullBox):
@@ -452,35 +452,37 @@ class SencBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
+            # to read this box, we need to know IV size
             self.box_info['sample_count'] = read_u32(fp)
             iv_size_guess = ((self.size - 16) // self.box_info['sample_count'])
-            if int(self.box_info['flags'][-1], 16) & 2:
-                # I don't think this logic is infallible
-                if iv_size_guess < 10:
-                    iv_size = 0
-                elif 10 <= iv_size_guess < 18:
-                    iv_size = 8
-                else:
-                    iv_size = 16
-                self.box_info['iv_size'] = iv_size
+            if not int(self.box_info['flags'][-1], 16) & 2:
+                # if no sub-sampling, assume IV has a fixed size 8 or 16 bytes
+                self.box_info['iv_size'] = 16 if (self.box_info['sample_count'] * 16) <= (self.size - 16) else 8
                 self.box_info['sample_list'] = []
                 for i in range(self.box_info['sample_count']):
-                    sample_dict = {'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8'),
-                                   'subsample_count': read_u16(fp), 'subsample_list': []}
-                    for j in range(sample_dict['subsample_count']):
-                        sample_dict['subsample_list'].append({
-                                                            'BytesOfClearData': read_u16(fp),
-                                                            'BytesOfEncryptedData': read_u32(fp)
-                                                            })
-                    self.box_info['sample_list'].append(sample_dict)
-            else:
-                iv_size = iv_size_guess
-                self.box_info['iv_size'] = iv_size
-                self.box_info['sample_list'] = []
-                for i in range(self.box_info['sample_count']):
-                    self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')})
+                    self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(self.box_info['iv_size'])).decode('utf-8')})
         finally:
             fp.seek(self.start_of_box + self.size)
+
+    def populate_sample_table(self, fp, iv_size):
+        # called if sub-sampling used, once we've determined IV size (N.B. assumes IV size constant)
+        try:
+            fp_orig = fp.tell()
+            # move fp to start of list
+            fp.seek(self.start_of_box + self.header.header_size + 8)
+            self.box_info['iv_size'] = iv_size
+            self.box_info['sample_list'] = []
+            for i in range(self.box_info['sample_count']):
+                sample_dict = {'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8'),
+                               'subsample_count': read_u16(fp), 'subsample_list': []}
+                for j in range(sample_dict['subsample_count']):
+                    sample_dict['subsample_list'].append({
+                        'BytesOfClearData': read_u16(fp),
+                        'BytesOfEncryptedData': read_u32(fp)
+                    })
+                self.box_info['sample_list'].append(sample_dict)
+        finally:
+            fp.seek(fp_orig)
 
 
 class GminBox(Mp4FullBox):
