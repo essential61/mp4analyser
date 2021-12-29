@@ -570,6 +570,24 @@ class IodsBox(Mp4FullBox):
             object_dict['graphics_profile_level'] = read_u8(fp)
             # unsure if further optional tags can exist
             self.box_info['initial_object_descriptor'] = object_dict
-            #self.box_info['message'] = 'TODO'
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class XyzBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['data_size'] = read_u16(fp)
+            lang = read_u16(fp)
+            if lang == 0:
+                self.box_info['language'] = '0x00'
+            else:
+                ch1 = str(chr(96 + (lang >> 10 & 31)))
+                ch2 = str(chr(96 + (lang >> 5 & 31)))
+                ch3 = str(chr(96 + (lang & 31)))
+                self.box_info['language'] = ch1 + ch2 + ch3
+            self.box_info['data'] = fp.read(self.box_info['data_size']).decode('utf-8', errors="ignore")
         finally:
             fp.seek(self.start_of_box + self.size)
