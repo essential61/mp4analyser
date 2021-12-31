@@ -66,13 +66,17 @@ class Mp4Box:
                 type_matches += box.search_child_boxes_for_type(box_type)
         return type_matches
 
+
 class Mp4FullBox(Mp4Box):
-    """ Derived from Mp4Box, but with version and flags.  """
+    """
+    Derived from Mp4Box, but with version and flags.
+    """
     def __init__(self, fp, header, parent):
         """ The file pointer, fp will move forward 4 bytes """
         super().__init__(fp, header, parent)
         four_bytes = read_u32(fp)
-        self.box_info = {'version': four_bytes // 16777216, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
+        self.version = four_bytes >> 24
+        self.flags = four_bytes & 0xFFFFFF
 
 
 class Header:

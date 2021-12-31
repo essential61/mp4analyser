@@ -172,7 +172,7 @@ class Mp4File:
                                     'sample_count': trun.box_info['sample_count'],
                                     'run_samples': []
                                     }
-                        has_sample_size = True if int(trun.box_info['flags'][-3], 16) & 2 == 2 else False
+                        has_sample_size = True if trun.flags & 0x0200 == 0x0200 else False
                         for l, sample in enumerate(trun.box_info['samples'], 1):
                             if not has_sample_size:
                                 sample_size = tfhd.box_info['default_sample_size']
@@ -303,12 +303,18 @@ class MetaBox(Mp4Box):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            four_bytes = read_u32(fp)
-            if four_bytes == 0:
-                self.box_info = {'version': 0, 'flags': "{0:#08x}".format(four_bytes % 16777216)}
+            bytes_left = self.size - self.header.header_size
+            first_four_bytes = read_u32(fp)
+            second_four_bytes = fp.read(4)
+            if second_four_bytes.decode('utf-8', errors="ignore") == 'hdlr':
+                # it's non-versioned
+                fp.seek(-8, 1)
             else:
+                # it's versioned
+                self.version = first_four_bytes >> 24
+                self.flags = first_four_bytes & 0xFFFFFF
                 fp.seek(-4, 1)
-            bytes_left = self.size - (self.header.header_size + 4)
+                bytes_left -= 4
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
@@ -334,7 +340,7 @@ class MvhdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             dt_base = datetime.datetime(1904, 1, 1, 0, 0, 0)
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['creation_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u64(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['modification_time'] = (
@@ -373,7 +379,7 @@ class MehdBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['fragment_duration'] = read_u64(fp)
             else:
                 self.box_info['fragment_duration'] = read_u32(fp)
@@ -388,7 +394,7 @@ class ElstBox(Mp4FullBox):
         try:
             self.box_info['entry_count'] = read_u32(fp)
             for i in range(self.box_info['entry_count']):
-                if self.box_info['version'] == 1:
+                if self.version == 1:
                     self.box_info['segment_duration'] = read_u64(fp)
                     self.box_info['media_time'] = read_i64(fp)
                 else:
@@ -406,7 +412,7 @@ class TkhdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             dt_base = datetime.datetime(1904, 1, 1, 0, 0, 0)
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['creation_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u64(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['modification_time'] = (
@@ -440,24 +446,19 @@ class TfhdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['track_id'] = read_u32(fp)
-            if int(self.box_info['flags'][-1], 16)  & 1 == 1:
+            if self.flags  & 0x000001 == 0x000001:
                 self.box_info['base_data_offset'] = read_u64(fp)
-            if int(self.box_info['flags'][-1], 16) & 2 == 2:
+            if self.flags  & 0x000002 == 0x000002:
                 self.box_info['sample_description_index'] = read_u32(fp)
-            if int(self.box_info['flags'][-1], 16) & 8 == 8:
+            if self.flags  & 0x000008 == 0x000008:
                 self.box_info['default_sample_duration'] = read_u32(fp)
-            if int(self.box_info['flags'][-2], 16) & 1 == 1:
+            if self.flags  & 0x000010 == 0x000010:
                 self.box_info['default_sample_size'] = read_u32(fp)
-            if int(self.box_info['flags'][-2], 16) & 2 == 2:
+            if self.flags  & 0x000020 == 0x000020:
                 self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
-            if int(self.box_info['flags'][-5], 16) & 1 == 1:
-                self.box_info['duration_is_empty'] = True
-            else:
-                self.box_info['duration_is_empty'] = False
-            if int(self.box_info['flags'][-5], 16) & 2 == 2:
-                self.box_info['default_base_is_moof'] = True
-            else:
-                self.box_info['default_base_is_moof'] = False
+            self.box_info['duration_is_empty'] = True if self.flags  & 0x010000 == 0x010000 else False
+            # depending on value of base data offset this flag mght be ignored
+            self.box_info['default_base_is_moof'] = True if self.flags  & 0x020000 == 0x020000 else False
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -514,7 +515,7 @@ class TfraBox(Mp4FullBox):
             self.box_info['entry_list'] = []
             for i in range(self.box_info['number_of_entry']):
                 entry_dict = {}
-                if self.box_info['version'] == 1:
+                if self.version == 1:
                     entry_dict['time'] = read_u64(fp)
                     entry_dict['moof_offset'] = read_u64(fp)
                 else:
@@ -615,22 +616,22 @@ class IlocBox(Mp4FullBox):
             self.box_info['offset_size'] = read_u32(fp)
             self.box_info['length_size'] = read_u32(fp)
             self.box_info['base_offset_size'] = read_u32(fp)
-            if self.box_info['version'] == 1 or self.box_info['version'] == 2:
+            if self.version == 1 or self.version == 2:
                 self.box_info['index_size'] = read_u32(fp)
             else:
                 self.box_info['reserved'] = read_u32(fp)
-            if self.box_info['version'] < 2:
+            if self.version < 2:
                 self.box_info['item_count'] = read_u16(fp)
-            elif self.box_info['version'] == 2:
+            elif self.version == 2:
                 self.box_info['item_count'] = read_u32(fp)
             self.box_info['item_list'] = []
             for i in range(self.box_info['item_count']):
                 item = {}
-                if self.box_info['version'] < 2:
+                if self.version < 2:
                     item['item_ID'] = read_u16(fp)
-                elif self.box_info['version'] == 2:
+                elif self.version == 2:
                     item['item_ID'] = read_u32(fp)
-                if self.box_info['version'] == 1 or self.box_info['version'] == 2:
+                if self.version == 1 or self.version == 2:
                     item['construction_method'] = read_u16(fp) % 16
                 item['data_reference_index'] = read_u16(fp)
                 if self.box_info['offset_size'] == 4:
@@ -641,7 +642,7 @@ class IlocBox(Mp4FullBox):
                 item['extent_list'] = []
                 for j in range(item['extent_count']):
                     extent = {}
-                    if self.box_info['version'] == 1 or self.box_info['version'] == 2:
+                    if self.version == 1 or self.version == 2:
                         if self.box_info['index_size'] == 4:
                             extent['extent_index'] = read_u32(fp)
                         elif self.box_info['index_size'] == 8:
@@ -691,7 +692,7 @@ class SchmBox(Mp4FullBox):
         try:
             self.box_info['scheme_type'] = fp.read(4).decode('utf-8')
             self.box_info['scheme_version'] = read_u32(fp)
-            if int(self.box_info['flags'][-1], 16) & 1 == 1:
+            if self.flags & 0x000001 == 0x000001:
                 self.box_info['data_offset'] = fp.read(self.size - (self.header.header_size + 12)).decode('utf-8')
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -712,7 +713,7 @@ class PitmBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if self.box_info['version'] == 0:
+            if self.version == 0:
                 self.box_info['item_ID'] = read_u16(fp)
             else:
                 self.box_info['item_ID'] = read_u32(fp)
@@ -754,14 +755,14 @@ class TrunBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['sample_count'] = read_u32(fp)
-            if int(self.box_info['flags'][-1], 16) & 1 == 1:
+            if self.flags & 0x000001 == 0x000001:
                 self.box_info['data_offset'] = read_i32(fp)
-            if int(self.box_info['flags'][-1], 16) & 4 == 4:
+            if self.flags & 0x000004 == 0x000004:
                 self.box_info['first_sample_flags'] = "{0:#08x}".format(read_u32(fp))
-            has_sample_duration = True if int(self.box_info['flags'][-3], 16) & 1 == 1 else False
-            has_sample_size = True if int(self.box_info['flags'][-3], 16) & 2 == 2 else False
-            has_sample_flags = True if int(self.box_info['flags'][-3], 16) & 4 == 4 else False
-            has_scto = True if int(self.box_info['flags'][-3], 16) & 8 == 8 else False
+            has_sample_duration = True if self.flags & 0x000100 == 0x000100 else False
+            has_sample_size = True if self.flags & 0x000200 == 0x000200 else False
+            has_sample_flags = True if self.flags & 0x000400 == 0x000400 else False
+            has_scto = True if self.flags & 0x000800 == 0x000800 else False
             sample_list = []
             for i in range(self.box_info['sample_count']):
                 sample = {}
@@ -772,7 +773,7 @@ class TrunBox(Mp4FullBox):
                 if has_sample_flags:
                     sample['sample_flags'] = "{0:#08x}".format(read_u32(fp))
                 if has_scto:
-                    if int(self.box_info['version']) == 1:
+                    if self.version == 1:
                         self.box_info['sample_composition_time_offset'] = read_u64(fp)
                     else:
                         self.box_info['sample_composition_time_offset'] = read_u32(fp)
@@ -787,7 +788,7 @@ class TfdtBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if int(self.box_info['version']) == 1:
+            if self.version == 1:
                 self.box_info['baseMediaDecode'] = read_u64(fp)
             else:
                 self.box_info['baseMediaDecode'] = read_u32(fp)
@@ -801,7 +802,7 @@ class MdhdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             dt_base = datetime.datetime(1904, 1, 1, 0, 0, 0)
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['creation_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u64(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['modification_time'] = (
@@ -857,7 +858,7 @@ class Url_Box(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if int(self.box_info['flags'][-1], 16) != 1:
+            if self.flags & 0x000001 != 1:
                 data_entry = fp.read(self.size - (self.header.header_size + 4))
                 self.box_info['location'] = data_entry.decode('utf-8', errors="ignore")
         finally:
@@ -869,7 +870,7 @@ class Urn_Box(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if int(self.box_info['flags'][-1], 16) != 1:
+            if self.flags & 0x000001 != 1:
                 name, ignore, location = fp.read(self.size - (self.header.header_size + 4)).partition(b'\x00')
                 self.box_info['name'] = location.decode('utf-8', errors="ignore")
                 self.box_info['location'] = location.decode('utf-8', errors="ignore")
@@ -924,7 +925,7 @@ class TrafBox(ContainerBox):
             if senc:
                 # check if it has sub-sampling before getting IV_size from sgpd or saiz
 
-                if int(senc.box_info['flags'][-1], 16) & 2:
+                if senc.flags & 0x000002 == 0x000002:
                     iv_size = 0
                     # try getting from sgpd (commented out for now as getting from saiz probably more reliable)
                     #sgpd = [box for box in self.child_boxes if box.type == 'sgpd'][0] if [
@@ -1030,7 +1031,7 @@ class CttsBox(Mp4FullBox):
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
-                if self.box_info['version'] == 1:
+                if self.version == 1:
                     self.box_info['entry_list'].append({'sample_count': read_u32(fp), 'sample_offset': read_i32(fp)})
                 else:
                     self.box_info['entry_list'].append({'sample_count': read_u32(fp), 'sample_offset': read_i32(fp)})
@@ -1043,7 +1044,7 @@ class CslgBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['compositionToDTSShift'] = read_i64(fp)
                 self.box_info['leastDecodeToDisplayDelta'] = read_i64(fp)
                 self.box_info['greatestDecodeToDisplayDelta'] = read_i64(fp)
@@ -1158,7 +1159,7 @@ class SubsBox(Mp4FullBox):
                 if subsample_count > 0:
                     subsample_list = []
                     for j in range(subsample_count):
-                        if self.box_info['version'] == 1:
+                        if self.version == 1:
                             subsample_size = read_u32(fp)
                         else:
                             subsample_size = read_u16(fp)
@@ -1186,7 +1187,7 @@ class SbgpBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['grouping_type'] = fp.read(4).decode('utf-8')
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['grouping_type_parameter'] = read_u32(fp)
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['entry_list'] = []
@@ -1205,14 +1206,14 @@ class SgpdBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['grouping_type'] = fp.read(4).decode('utf-8')
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['default_length'] = read_u32(fp)
-            elif self.box_info['version'] >= 2:
+            elif self.version >= 2:
                 self.box_info['default_sample_description_index'] = read_u32(fp)
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
-                if self.box_info['default_length'] == 0 and self.box_info['version'] == 1:
+                if self.box_info['default_length'] == 0 and self.version == 1:
                     description_length = read_u32(fp)
                 else:
                     description_length = self.box_info['default_length']
@@ -1238,7 +1239,7 @@ class SaizBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if int(self.box_info['flags'][-1], 16) == 1:
+            if self.flags & 0x000001 == 0x000001:
                 self.box_info['aux_info_type'] = fp.read(4).decode('utf-8')
                 self.box_info['aux_info_type_parameter'] = read_u32(fp)
             self.box_info['default_sample_info_size'] = read_u8(fp)
@@ -1256,13 +1257,13 @@ class SaioBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            if int(self.box_info['flags'][-1], 16) == 1:
+            if self.flags & 0x000001 == 0x000001:
                 self.box_info['aux_info_type'] = fp.read(4).decode('utf-8')
                 self.box_info['aux_info_type_parameter'] = read_u32(fp)
             self.box_info['entry_count'] = read_u32(fp)
             self.box_info['offset_list'] = []
             for i in range(self.box_info['entry_count']):
-                if self.box_info['version'] == 0:
+                if self.version == 0:
                     self.box_info['offset_list'].append({'offset': read_u32(fp)})
                 else:
                     self.box_info['offset_list'].append({'offset': read_u64(fp)})
@@ -1358,7 +1359,7 @@ class SidxBox(Mp4FullBox):
         try:
             self.box_info['reference_ID'] = read_u32(fp)
             self.box_info['timescale'] = read_u32(fp)
-            if self.box_info['version'] == 0:
+            if self.version == 0:
                 self.box_info['earliest_presentation_time'] = read_u32(fp)
                 self.box_info['first_offset'] = read_u32(fp)
             else:
@@ -1409,7 +1410,7 @@ class PrftBox(Mp4FullBox):
         try:
             self.box_info['reference_track_id'] = read_u32(fp)
             self.box_info['ntp_timestamp'] = read_u64(fp)
-            if self.box_info['version'] == 0:
+            if self.version == 0:
                 self.box_info['media_time'] = read_u32(fp)
             else:
                 self.box_info['media_time'] = read_u64(fp)

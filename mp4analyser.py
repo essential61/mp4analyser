@@ -381,6 +381,8 @@ class MyApp(Tk):
     def prepare_string_for_text_widget(self, box_selected):
         my_string = "Box is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.start_of_box)
         my_string += "Has header:\n{0:s}\n\n".format(json.dumps(box_selected.header.get_header()))
+        my_string += "Has version: {0:d}\n".format(box_selected.version) if hasattr(box_selected, 'version') else ""
+        my_string += "Has flags: {0:#08x}\n\n".format(box_selected.flags) if hasattr(box_selected, 'flags') else ""
         if len(box_selected.box_info) > 0:
             # insertion order is preserved in modern Python
             my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.box_info, indent=2))

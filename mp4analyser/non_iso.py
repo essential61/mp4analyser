@@ -168,7 +168,7 @@ class Av1cBox(Mp4Box):
         try:
             first_byte = read_u8(fp)
             self.box_info['marker'] = (first_byte >> 7) & 0x01
-            self.box_info['version'] = first_byte & 0x7f
+            self.version = first_byte & 0x7f
             second_byte = read_u8(fp)
             self.box_info['seq_profile'] = (second_byte >> 5) & 0x07
             self.box_info['seq_level_idx_0'] = second_byte & 0x1f
@@ -434,7 +434,7 @@ class TencBox(Mp4FullBox):
         try:
             self.box_info['reserved'] = read_u8(fp)
             byte_block = read_u8(fp)
-            if self.box_info['version'] == 1:
+            if self.version == 1:
                 self.box_info['default_crypt_byte_block'] = byte_block >> 4
                 self.box_info['default_skip_byte_block'] = byte_block & 15
             self.box_info['default_isProtected'] = read_u8(fp)
@@ -455,7 +455,7 @@ class SencBox(Mp4FullBox):
             # to read this box, we need to know IV size
             self.box_info['sample_count'] = read_u32(fp)
             iv_size_guess = ((self.size - 16) // self.box_info['sample_count'])
-            if not int(self.box_info['flags'][-1], 16) & 2:
+            if self.flags & 0x000002 != 0x000002:
                 # if no sub-sampling, assume IV has a fixed size 8 or 16 bytes
                 self.box_info['iv_size'] = 16 if (self.box_info['sample_count'] * 16) <= (self.size - 16) else 8
                 self.box_info['sample_list'] = []

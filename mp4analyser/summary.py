@@ -36,7 +36,7 @@ class Summary:
                              if box.type == 'stbl'][0]
                 t = mdhd.box_info['timescale']
                 d = mdhd.box_info['duration']
-                v = mdhd.box_info['version']
+                v = mdhd.version
 
                 sz = [box for box in stbl.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
                 sc = sz.box_info['sample_count']
