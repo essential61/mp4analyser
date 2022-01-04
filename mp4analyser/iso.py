@@ -325,6 +325,7 @@ class MetaBox(Mp4Box):
 
 
 class MdatBox(Mp4Box):
+
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         self.sample_list = []
@@ -1225,7 +1226,7 @@ class SgpdBox(Mp4FullBox):
                                                             'per_sample_iv_size': int(sample_group_entry[6:8], 16),
                                                             'kid': sample_group_entry[8:40]}
                     if seig_dict['is_encrypted'] == 1 and seig_dict['per_sample_iv_size'] == 0:
-                        seig_dict['constant_IV_size'] = sample_group_entry[40:42]
+                        seig_dict['constant_IV_size'] = int(sample_group_entry[40:42], 16)
                         seig_dict['constant_IV'] = sample_group_entry[42:]
                     self.box_info['entry_list'].append(seig_dict)
                 else:
