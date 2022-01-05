@@ -457,10 +457,10 @@ class SencBox(Mp4FullBox):
             iv_size_guess = ((self.size - 16) // self.box_info['sample_count'])
             if self.flags & 0x000002 != 0x000002:
                 # if no sub-sampling, assume IV has a fixed size 8 or 16 bytes
-                self.box_info['iv_size'] = 16 if (self.box_info['sample_count'] * 16) <= (self.size - 16) else 8
+                iv_size = 16 if (self.box_info['sample_count'] * 16) <= (self.size - 16) else 8
                 self.box_info['sample_list'] = []
                 for i in range(self.box_info['sample_count']):
-                    self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(self.box_info['iv_size'])).decode('utf-8')})
+                    self.box_info['sample_list'].append({'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')})
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -470,11 +470,11 @@ class SencBox(Mp4FullBox):
             fp_orig = fp.tell()
             # move fp to start of list
             fp.seek(self.start_of_box + self.header.header_size + 8)
-            self.box_info['iv_size'] = iv_size
             self.box_info['sample_list'] = []
             for i in range(self.box_info['sample_count']):
-                sample_dict = {'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8'),
-                               'subsample_count': read_u16(fp), 'subsample_list': []}
+                sample_dict = {'iv': binascii.b2a_hex(fp.read(iv_size)).decode('utf-8')} if iv_size else {}
+                sample_dict['subsample_count'] = read_u16(fp)
+                sample_dict['subsample_list'] = []
                 for j in range(sample_dict['subsample_count']):
                     sample_dict['subsample_list'].append({
                         'BytesOfClearData': read_u16(fp),

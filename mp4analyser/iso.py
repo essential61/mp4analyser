@@ -925,19 +925,17 @@ class TrafBox(ContainerBox):
                 box for box in self.child_boxes if box.type == 'senc'] else False
             if senc:
                 # check if it has sub-sampling before getting IV_size from sgpd or saiz
-
                 if senc.flags & 0x000002 == 0x000002:
-                    iv_size = 0
-                    # try getting from sgpd (commented out for now as getting from saiz probably more reliable)
-                    #sgpd = [box for box in self.child_boxes if box.type == 'sgpd'][0] if [
-                    #    box for box in self.child_boxes if box.type == 'sgpd'] else False
-                    #if sgpd and sgpd.box_info['grouping_type'] == 'seig':
-                        # I've only ever seen a single entry in seig so get IV size from this
-                    #    iv_size = sgpd.box_info['entry_list'][0]['per_sample_iv_size']
-                    # try saiz
+                    per_sample_iv_size = 0
+                    sgpd = [box for box in self.child_boxes if box.type == 'sgpd'][0] if [
+                       box for box in self.child_boxes if box.type == 'sgpd'] else False
                     saiz = [box for box in self.child_boxes if box.type == 'saiz'][0] if [
                         box for box in self.child_boxes if box.type == 'saiz'] else False
-                    if saiz:
+                    if sgpd and sgpd.box_info['grouping_type'] == 'seig':
+                        # I've only ever seen a single entry in seig so get IV size from this
+                        per_sample_iv_size = sgpd.box_info['entry_list'][0]['per_sample_iv_size']
+                    # try saiz
+                    elif saiz:
                         # does it have non-zero default size?
                         if saiz.box_info['default_sample_info_size'] > 0:
                             sample_size = saiz.box_info['default_sample_info_size']
@@ -946,8 +944,8 @@ class TrafBox(ContainerBox):
                                                 for sample in saiz.box_info['sample_info_size_list']])
                         # deduct 10 or 18 from sample size (8 or 16 byte IV + 2 byte sub-sample count) and divide by six
                         # (2 bytes clear data size + 4 bytes enc data size)
-                        iv_size = 8 if (sample_size - 10) % 6 == 0 else 16 if (sample_size - 18) % 6 == 0 else 0
-                    senc.populate_sample_table(fp, iv_size)
+                        per_sample_iv_size = 8 if (sample_size - 10) % 6 == 0 else 16 if (sample_size - 18) % 6 == 0 else 0
+                    senc.populate_sample_table(fp, per_sample_iv_size)
         finally:
             fp.seek(self.start_of_box + self.size)
 
