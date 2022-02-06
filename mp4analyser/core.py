@@ -18,7 +18,7 @@ class Mp4Box:
         self.header = header
         self.parent = parent
         self.start_of_box = fp.tell() - self.header.header_size
-        self.child_boxes = []
+        self.children = []
         self.box_info = {}
         self.byte_string = None
         # only top-level boxes contain an actual byte array for displaying the hex view, lower-level boxes simply
@@ -57,11 +57,11 @@ class Mp4Box:
 
     def search_child_boxes_for_type(self, box_type):
         type_matches = []
-        for box in self.child_boxes:
+        for box in self.children:
             if box.type == box_type:
                 # append object onto array
                 type_matches.append(box)
-            if box.child_boxes:
+            if box.children:
                 # add array onto array
                 type_matches += box.search_child_boxes_for_type(box_type)
         return type_matches

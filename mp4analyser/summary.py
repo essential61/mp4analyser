@@ -8,7 +8,7 @@ class Summary:
     """ Summary Class for an Mp4File Class """
 
     def __init__(self, mp4file):
-        boxes = mp4file.child_boxes
+        boxes = mp4file.children
         self.data = {}
         self.data['filename'] = mp4file.filename
         self.data['filesize (bytes)'] = os.path.getsize(mp4file.filename)
@@ -18,27 +18,27 @@ class Summary:
         # check if there is a moov and if there is a moov that contains traks N.B only ever 0,1 moov boxes
         if [box for box in boxes if box.type == 'moov']:
             moov = [box for box in boxes if box.type == 'moov'][0]
-            mvhd = [mvbox for mvbox in moov.child_boxes if mvbox.type == 'mvhd'][0]
+            mvhd = [mvbox for mvbox in moov.children if mvbox.type == 'mvhd'][0]
             self.data['creation_time'] = mvhd.box_info['creation_time']
             self.data['modification_time'] = mvhd.box_info['modification_time']
             self.data['duration (secs)'] = round(mvhd.box_info['duration'] / mvhd.box_info['timescale'])
             if self.data['duration (secs)'] > 0:
                 self.data['bitrate (bps)'] = round(8 * self.data['filesize (bytes)'] / self.data['duration (secs)'])
-            traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
+            traks = [tbox for tbox in moov.children if tbox.type == 'trak']
             self.data['track_list'] = []
             for trak in traks:
                 this_trak = {}
-                this_trak['track_id'] = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
-                mdia = [box for box in trak.child_boxes if box.type == 'mdia'][0]
-                mdhd = [box for box in mdia.child_boxes if box.type == 'mdhd'][0]
-                hdlr = [box for box in mdia.child_boxes if box.type == 'hdlr'][0]
-                stbl = [box for box in [box for box in mdia.child_boxes if box.type == 'minf'][0].child_boxes
+                this_trak['track_id'] = [box for box in trak.children if box.type == 'tkhd'][0].box_info['track_ID']
+                mdia = [box for box in trak.children if box.type == 'mdia'][0]
+                mdhd = [box for box in mdia.children if box.type == 'mdhd'][0]
+                hdlr = [box for box in mdia.children if box.type == 'hdlr'][0]
+                stbl = [box for box in [box for box in mdia.children if box.type == 'minf'][0].children
                              if box.type == 'stbl'][0]
                 t = mdhd.box_info['timescale']
                 d = mdhd.box_info['duration']
                 v = mdhd.version
 
-                sz = [box for box in stbl.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
+                sz = [box for box in stbl.children if box.type == 'stsz' or box.type == 'stz2'][0]
                 sc = sz.box_info['sample_count']
                 if sz.box_info['sample_size'] > 0:
                     # uniform sample size
@@ -53,7 +53,7 @@ class Summary:
                         this_trak['track_bitrate (calculated bps)'] = round(8 * trak_size / this_trak['track_duration (secs)'])
                         sample_rate = round((sc * t) / d, 2)
 
-                codec_info = ([box for box in stbl.child_boxes if box.type == 'stsd'][0]).child_boxes[0]
+                codec_info = ([box for box in stbl.children if box.type == 'stsd'][0]).children[0]
                 media = hdlr.box_info['handler_type']
                 if media == 'vide':
                     this_trak['media_type'] = 'video'

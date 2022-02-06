@@ -50,14 +50,14 @@ class Mp4File:
     def __init__(self, filename):
         self.filename = filename
         self.type = 'file'
-        self.child_boxes = []
+        self.children = []
         self.summary= {}
         with open(filename, 'rb') as f:
             end_of_file = False
             while not end_of_file:
                 current_header = Header(f)
                 current_box = box_factory(f, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 if current_box.size == 0:
                     end_of_file = True
                 if len(f.read(4)) != 4:
@@ -70,30 +70,30 @@ class Mp4File:
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
-        mdats = [mbox for mbox in self.child_boxes if mbox.type == 'mdat']
+        mdats = [mbox for mbox in self.children if mbox.type == 'mdat']
         # generate a sample list if there is a moov that contains traks N.B only ever 0,1 moov boxes
-        if [box for box in self.child_boxes if box.type == 'moov']:
-            moov = [box for box in self.child_boxes if box.type == 'moov'][0]
-            traks = [tbox for tbox in moov.child_boxes if tbox.type == 'trak']
+        if [box for box in self.children if box.type == 'moov']:
+            moov = [box for box in self.children if box.type == 'moov'][0]
+            traks = [tbox for tbox in moov.children if tbox.type == 'trak']
             sample_list = []
             for trak in traks:
-                trak_id = [box for box in trak.child_boxes if box.type == 'tkhd'][0].box_info['track_ID']
-                timescale = [box for box in [box for box in trak.child_boxes
-                                             if box.type == 'mdia'][0].child_boxes
+                trak_id = [box for box in trak.children if box.type == 'tkhd'][0].box_info['track_ID']
+                timescale = [box for box in [box for box in trak.children
+                                             if box.type == 'mdia'][0].children
                              if box.type == 'mdhd'][0].box_info['timescale']
-                samplebox = [box for box in [box for box in [box for box in trak.child_boxes
-                                                             if box.type == 'mdia'][0].child_boxes
-                                             if box.type == 'minf'][0].child_boxes
+                samplebox = [box for box in [box for box in [box for box in trak.children
+                                                             if box.type == 'mdia'][0].children
+                                             if box.type == 'minf'][0].children
                              if box.type == 'stbl'][0]
-                chunk_offsets = [box for box in samplebox.child_boxes
+                chunk_offsets = [box for box in samplebox.children
                                  if box.type == 'stco' or box.type == 'co64'][0].box_info['entry_list']
-                sample_size_box = [box for box in samplebox.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0]
+                sample_size_box = [box for box in samplebox.children if box.type == 'stsz' or box.type == 'stz2'][0]
                 if sample_size_box.box_info['sample_size'] > 0:
                     sample_sizes = [{'entry_size': sample_size_box.box_info['sample_size']}
                                     for i in range(sample_size_box.box_info['sample_count'])]
                 else:
                     sample_sizes = sample_size_box.box_info['entry_list']
-                sample_to_chunks = [box for box in samplebox.child_boxes
+                sample_to_chunks = [box for box in samplebox.children
                                     if box.type == 'stsc'][0].box_info['entry_list']
                 s2c_index = 0
                 next_run = 0
@@ -138,20 +138,20 @@ class Mp4File:
         I've only ever seen 1 mdat in a media segment though
         """
         i = 0
-        while i < len(self.child_boxes) - 1:
-            if self.child_boxes[i].type == 'moof':
-                moof = self.child_boxes[i]
+        while i < len(self.children) - 1:
+            if self.children[i].type == 'moof':
+                moof = self.children[i]
                 media_segment = {'moof_box': moof, 'mdat_boxes': []}
-                sequence_number = [mfhd for mfhd in moof.child_boxes
+                sequence_number = [mfhd for mfhd in moof.children
                                    if mfhd.type == 'mfhd'][0].box_info['sequence_number']
-                while i < len(self.child_boxes) - 1 and self.child_boxes[i + 1].type == 'mdat':
-                    media_segment['mdat_boxes'].append(self.child_boxes[i + 1])
+                while i < len(self.children) - 1 and self.children[i + 1].type == 'mdat':
+                    media_segment['mdat_boxes'].append(self.children[i + 1])
                     i += 1
                 # I've only ever seen 1 traf in a moof, but the standard says there could be more
                 data_offset = 0
-                for j,traf in enumerate([tbox for tbox in moof.child_boxes if tbox.type == 'traf']):
+                for j,traf in enumerate([tbox for tbox in moof.children if tbox.type == 'traf']):
                     # read tfhd, there will be one
-                    tfhd = [hbox for hbox in traf.child_boxes if hbox.type == 'tfhd'][0]
+                    tfhd = [hbox for hbox in traf.children if hbox.type == 'tfhd'][0]
                     trak_id = tfhd.box_info['track_id']
                     if 'base_data_offset' in tfhd.box_info:
                         data_offset = tfhd.box_info['base_data_offset']
@@ -162,7 +162,7 @@ class Mp4File:
                         pass
                     else:
                         base_data_offset = media_segment['moof_box'].start_of_box
-                    for k, trun in enumerate([rbox for rbox in traf.child_boxes if rbox.type == 'trun'], 1):
+                    for k, trun in enumerate([rbox for rbox in traf.children if rbox.type == 'trun'], 1):
                         if 'data_offset' in trun.box_info:
                             data_offset += trun.box_info['data_offset']
                         run_dict = {'sequence_number': sequence_number,
@@ -204,10 +204,10 @@ class Mp4File:
 
     def search_boxes_for_type(self, box_type):
         type_matches = []
-        for box in self.child_boxes:
+        for box in self.children:
             if box.type == box_type:
                 type_matches.append(box)
-            if box.child_boxes:
+            if box.children:
                 type_matches += box.search_child_boxes_for_type(box_type)
         return type_matches
 # Box classes
@@ -284,7 +284,7 @@ class ContainerBox(Mp4Box):
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -318,7 +318,7 @@ class MetaBox(Mp4Box):
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -671,7 +671,7 @@ class IproBox(Mp4FullBox):
             for i in range(self.box_info['protection_count']):
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -732,7 +732,7 @@ class IrefBox(Mp4FullBox):
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -849,7 +849,7 @@ class DrefBox(Mp4FullBox):
             for i in range(self.box_info['entry_count']):
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -900,13 +900,13 @@ class StblBox(ContainerBox):
         try:
             # Some sample table boxes have dependencies on other sample table table boxes in order to read correctly
             # Fill stdp, sdtp lists using sample count in stsz
-            sz = [box for box in self.child_boxes if box.type == 'stsz' or box.type == 'stz2'][0] if [
-                box for box in self.child_boxes if box.type == 'stsz' or box.type == 'stz2'] else False
+            sz = [box for box in self.children if box.type == 'stsz' or box.type == 'stz2'][0] if [
+                box for box in self.children if box.type == 'stsz' or box.type == 'stz2'] else False
             sc = sz.box_info['sample_count'] if sz else False
-            sdtp = [box for box in self.child_boxes if box.type == 'sdtp'][0] if [
-                box for box in self.child_boxes if box.type == 'sdtp'] else False
-            stdp = [box for box in self.child_boxes if box.type == 'stdp'][0] if [
-                box for box in self.child_boxes if box.type == 'stdp'] else False
+            sdtp = [box for box in self.children if box.type == 'sdtp'][0] if [
+                box for box in self.children if box.type == 'sdtp'] else False
+            stdp = [box for box in self.children if box.type == 'stdp'][0] if [
+                box for box in self.children if box.type == 'stdp'] else False
             if sc and sdtp:
                 sdtp.update_table(fp, sc)
             if sc and stdp:
@@ -921,16 +921,16 @@ class TrafBox(ContainerBox):
         super().__init__(fp, header, parent)
         try:
             # if we have a senc box
-            senc = [box for box in self.child_boxes if box.type == 'senc'][0] if [
-                box for box in self.child_boxes if box.type == 'senc'] else False
+            senc = [box for box in self.children if box.type == 'senc'][0] if [
+                box for box in self.children if box.type == 'senc'] else False
             if senc:
                 # check if it has sub-sampling before getting IV_size from sgpd or saiz
                 if senc.flags & 0x000002 == 0x000002:
                     per_sample_iv_size = 0
-                    sgpd = [box for box in self.child_boxes if box.type == 'sgpd'][0] if [
-                       box for box in self.child_boxes if box.type == 'sgpd'] else False
-                    saiz = [box for box in self.child_boxes if box.type == 'saiz'][0] if [
-                        box for box in self.child_boxes if box.type == 'saiz'] else False
+                    sgpd = [box for box in self.children if box.type == 'sgpd'][0] if [
+                       box for box in self.children if box.type == 'sgpd'] else False
+                    saiz = [box for box in self.children if box.type == 'saiz'][0] if [
+                        box for box in self.children if box.type == 'saiz'] else False
                     if sgpd and sgpd.box_info['grouping_type'] == 'seig':
                         # I've only ever seen a single entry in seig so get IV size from this
                         per_sample_iv_size = sgpd.box_info['entry_list'][0]['per_sample_iv_size']
@@ -1004,7 +1004,7 @@ class StsdBox(Mp4FullBox):
             for i in range(self.box_info['entry_count']):
                 current_header = Header(fp)
                 current_box = box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
         finally:
             fp.seek(self.start_of_box + self.size)
 

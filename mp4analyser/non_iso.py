@@ -60,7 +60,7 @@ class Avc1Box(Mp4FullBox):
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = mp4analyser.iso.box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -253,7 +253,7 @@ class Mp4aBox(Mp4Box):
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = mp4analyser.iso.box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -528,7 +528,7 @@ class IlstBox(Mp4Box):
                     current_header.type = "#{0:#d}".format(struct.unpack('>I', current_header.type.encode('utf-8'))[0])
                 # create box directly, not through box factory
                 current_box = ItemBox(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -542,7 +542,7 @@ class ItemBox(Mp4Box):
             while bytes_left > 7:
                 current_header = Header(fp)
                 current_box = mp4analyser.iso.box_factory(fp, current_header, self)
-                self.child_boxes.append(current_box)
+                self.children.append(current_box)
                 bytes_left -= current_box.size
         finally:
             fp.seek(self.start_of_box + self.size)
