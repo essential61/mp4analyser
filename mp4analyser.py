@@ -22,6 +22,7 @@ from tkinter import ttk
 
 import mp4analyser.iso
 import mkvanalyser.mkv
+import mkvanalyser.idlookups
 
 try:
     from idlelib.redirector import WidgetRedirector
@@ -204,21 +205,25 @@ class MyApp(Tk):
         logging.debug("Loading file " + filename)
         self.statustext.set("Loading...")
         self.update_idletasks()
-        if re.search("mkv$", filename):
-            self.populate_ui_mkv(mkvanalyser.mkv.MkvFile(filename))
+        matroska = False
+        with open(filename, 'rb') as f:
+            if f.read(4) == b'\x1a\x45\xdf\xa3':
+                matroska = True
+        if matroska:
+            self.populate_ui(mkvanalyser.mkv.MkvFile(filename))
         else:
-            self.populate_ui_mp4(mp4analyser.iso.Mp4File(filename))
+            self.populate_ui(mp4analyser.iso.Mp4File(filename))
         logging.debug("Finished loading file " + filename)
 
         self.statustext.set("")
         self.update_idletasks()
 
-    def populate_ui_mp4(self, new_file):
-        # sanity check that it is an ISO BMFF file
+    def populate_ui(self, new_file):
+        # sanity check that it is a valid file
         if (len(new_file.children) == 0) or (
                 len(new_file.children) == 1 and isinstance(new_file.children[0], mp4analyser.non_iso.UndefinedBox)):
-            logging.error(new_file.filename + " does not appear to be a valid ISO BMFF file.")
-            messagebox.showerror(message=new_file.filename + " does not appear to be a valid ISO BMFF file.")
+            logging.error(new_file.filename + " does not appear to be a valid Container file.")
+            messagebox.showerror(message=new_file.filename + " does not appear to be a valid Container file.")
             return
         self.containerfile = new_file
         self.dialog_dir, filename_base = os.path.split(self.containerfile.filename)
@@ -229,39 +234,50 @@ class MyApp(Tk):
         self.thex.delete(1.0, END)
         self.tsum.delete(1.0, END)
         self.tsum.insert(END, json.dumps(self.containerfile.get_summary(), indent=2))
+
+        def item_string(container):
+            if type(self.containerfile) ==  mp4analyser.iso.Mp4File:
+                return container.type
+            else:
+                if container.elementid in mkvanalyser.idlookups.id_table:
+                    return mkvanalyser.idlookups.id_table[container.elementid]['name']
+                else:
+                    return 'Unknown'
+
         # Now fill tree with new contents
         for l0, this_box in enumerate(self.containerfile.children):
-            self.tree.insert('', 'end', str(l0), text=str(l0) + " " + this_box.type, open=TRUE)
+            self.tree.insert('', 'end', str(l0), text=str(l0) + " " + item_string(this_box), open=TRUE)
             for l1, this_box in enumerate(this_box.children):
                 l1_iid = "{0}.{1}".format(l0, l1)
-                self.tree.insert(str(l0), 'end', l1_iid, text=l1_iid + " " + this_box.type, open=TRUE)
+                self.tree.insert(str(l0), 'end', l1_iid, text=l1_iid + " " + item_string(this_box), open=TRUE)
                 for l2, this_box in enumerate(this_box.children):
                     l2_iid = "{0}.{1}.{2}".format(l0, l1, l2)
-                    self.tree.insert(l1_iid, 'end', l2_iid, text=l2_iid + " " + this_box.type, open=TRUE)
+                    self.tree.insert(l1_iid, 'end', l2_iid, text=l2_iid + " " + item_string(this_box), open=TRUE)
                     for l3, this_box in enumerate(this_box.children):
                         l3_iid = "{0}.{1}.{2}.{3}".format(l0, l1, l2, l3)
-                        self.tree.insert(l2_iid, 'end', l3_iid, text=l3_iid + " " + this_box.type, open=TRUE)
+                        self.tree.insert(l2_iid, 'end', l3_iid, text=l3_iid + " " + item_string(this_box), open=TRUE)
                         for l4, this_box in enumerate(this_box.children):
                             l4_iid = "{0}.{1}.{2}.{3}.{4}".format(l0, l1, l2, l3, l4)
-                            self.tree.insert(l3_iid, 'end', l4_iid, text=l4_iid + " " + this_box.type, open=TRUE)
+                            self.tree.insert(l3_iid, 'end', l4_iid, text=l4_iid + " " + item_string(this_box), open=TRUE)
                             for l5, this_box in enumerate(this_box.children):
                                 l5_iid = "{0}.{1}.{2}.{3}.{4}.{5}".format(l0, l1, l2, l3, l4, l5)
-                                self.tree.insert(l4_iid, 'end', l5_iid, text=l5_iid + " " + this_box.type, open=TRUE)
+                                self.tree.insert(l4_iid, 'end', l5_iid, text=l5_iid + " " + item_string(this_box), open=TRUE)
                                 for l6, this_box in enumerate(this_box.children):
                                     l6_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}".format(l0, l1, l2, l3, l4, l5, l6)
-                                    self.tree.insert(l5_iid, 'end', l6_iid, text=l6_iid + " " + this_box.type,
+                                    self.tree.insert(l5_iid, 'end', l6_iid, text=l6_iid + " " + item_string(this_box),
                                                      open=TRUE)
                                     for l7, this_box in enumerate(this_box.children):
                                         l7_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}".format(l0, l1, l2, l3, l4, l5, l6,
                                                                                           l7)
-                                        self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + this_box.type,
+                                        self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + item_string(this_box),
                                                          open=TRUE)
                                         for l8, this_box in enumerate(this_box.children):
                                             l8_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}".format(l0, l1, l2, l3, l4, l5,
                                                                                               l6,
                                                                                               l7,
                                                                                               l8)
-                                            self.tree.insert(l7_iid, 'end', l8_iid, text=l8_iid + " " + this_box.type,
+                                            self.tree.insert(l7_iid, 'end',
+                                                             l8_iid, text=l8_iid + " " + item_string(this_box),
                                                              open=TRUE)
                                             for l9, this_box in enumerate(this_box.children):
                                                 l9_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}.{9}".format(l0, l1, l2, l3,
@@ -271,77 +287,7 @@ class MyApp(Tk):
                                                                                                       l8,
                                                                                                       l9)
                                                 self.tree.insert(l8_iid, 'end', l9_iid,
-                                                                 text=l9_iid + " " + this_box.type,
-                                                                 open=TRUE)
-        logging.debug("Summary " + json.dumps(self.containerfile.get_summary(), indent=2))
-        logging.debug("Finished populating " + self.containerfile.filename)
-
-    def populate_ui_mkv(self, new_file):
-        # sanity check that it is an ISO BMFF file
-        '''if (len(new_file.children) == 0) or (
-                len(new_file.children) == 1 and isinstance(new_file.children[0], mp4analyser.non_iso.UndefinedBox)):
-            logging.error(new_file.filename + " does not appear to be a valid ISO BMFF file.")
-            messagebox.showerror(message=new_file.filename + " does not appear to be a valid ISO BMFF file.")
-            return'''
-        self.containerfile = new_file
-        self.dialog_dir, filename_base = os.path.split(self.containerfile.filename)
-        self.title("MP4 Analyser - {0:s}".format(filename_base))
-        # Clear tree and text widgets if not empty
-        self.tree.delete(*self.tree.get_children())
-        self.t.delete(1.0, END)
-        self.thex.delete(1.0, END)
-        self.tsum.delete(1.0, END)
-        #self.tsum.insert(END, json.dumps(self.containerfile.get_summary(), indent=2))
-        # Now fill tree with new contents
-
-        def item_string(container):
-            if container.elementid in mkvanalyser.idlookups.id_table:
-                return mkvanalyser.idlookups.id_table[container.elementid]['name']
-            else:
-                return 'Unknown'
-
-        for l0, this_element in enumerate(self.containerfile.children):
-            self.tree.insert('', 'end', str(l0), text=str(l0) + " " + item_string(this_element), open=TRUE)
-            for l1, this_element in enumerate(this_element.children):
-                l1_iid = "{0}.{1}".format(l0, l1)
-                self.tree.insert(str(l0), 'end', l1_iid, text=l1_iid + " " + item_string(this_element), open=TRUE)
-                for l2, this_element in enumerate(this_element.children):
-                    l2_iid = "{0}.{1}.{2}".format(l0, l1, l2)
-                    self.tree.insert(l1_iid, 'end', l2_iid, text=l2_iid + " " + item_string(this_element), open=TRUE)
-                    for l3, this_element in enumerate(this_element.children):
-                        l3_iid = "{0}.{1}.{2}.{3}".format(l0, l1, l2, l3)
-                        self.tree.insert(l2_iid, 'end', l3_iid, text=l3_iid + " " + item_string(this_element), open=TRUE)
-                        for l4, this_element in enumerate(this_element.children):
-                            l4_iid = "{0}.{1}.{2}.{3}.{4}".format(l0, l1, l2, l3, l4)
-                            self.tree.insert(l3_iid, 'end', l4_iid, text=l4_iid + " " + item_string(this_element), open=TRUE)
-                            for l5, this_element in enumerate(this_element.children):
-                                l5_iid = "{0}.{1}.{2}.{3}.{4}.{5}".format(l0, l1, l2, l3, l4, l5)
-                                self.tree.insert(l4_iid, 'end', l5_iid, text=l5_iid + " " + item_string(this_element), open=TRUE)
-                                for l6, this_element in enumerate(this_element.children):
-                                    l6_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}".format(l0, l1, l2, l3, l4, l5, l6)
-                                    self.tree.insert(l5_iid, 'end', l6_iid, text=l6_iid + " " + item_string(this_element),
-                                                     open=TRUE)
-                                    for l7, this_element in enumerate(this_element.children):
-                                        l7_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}".format(l0, l1, l2, l3, l4, l5, l6,
-                                                                                          l7)
-                                        self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + item_string(this_element),
-                                                         open=TRUE)
-                                        for l8, this_element in enumerate(this_element.children):
-                                            l8_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}".format(l0, l1, l2, l3, l4, l5,
-                                                                                              l6,
-                                                                                              l7,
-                                                                                              l8)
-                                            self.tree.insert(l7_iid, 'end', l8_iid, text=l8_iid + " " + item_string(this_element),
-                                                             open=TRUE)
-                                            for l9, this_element in enumerate(this_element.children):
-                                                l9_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}.{9}".format(l0, l1, l2, l3,
-                                                                                                      l4, l5,
-                                                                                                      l6,
-                                                                                                      l7,
-                                                                                                      l8,
-                                                                                                      l9)
-                                                self.tree.insert(l8_iid, 'end', l9_iid,
-                                                                 text=l9_iid + " " + item_string(this_element),
+                                                                 text=l9_iid + " " + item_string(this_box),
                                                                  open=TRUE)
         logging.debug("Summary " + json.dumps(self.containerfile.get_summary(), indent=2))
         logging.debug("Finished populating " + self.containerfile.filename)
@@ -351,17 +297,14 @@ class MyApp(Tk):
         logging.debug("Box selected " + self.tree.focus())
         self.statustext.set("Loading...")
         self.update_idletasks()
-        if type(self.containerfile) == mp4analyser.iso.Mp4File:
-            if self.tree.focus()[0:5] == 'chunk':
-                self.select_chunk_details(self.tree.focus())
-            elif self.tree.focus()[0:6] == 'sample':
-                self.select_sample_details(self.tree.focus())
-            else:
-                self.select_box_details(self.tree.focus())
-            self.statustext.set("")
-            self.update_idletasks()
+        if self.tree.focus()[0:5] == 'chunk':
+            self.select_chunk_details(self.tree.focus())
+        elif self.tree.focus()[0:6] == 'sample':
+            self.select_sample_details(self.tree.focus())
         else:
             self.select_box_details(self.tree.focus())
+        self.statustext.set("")
+        self.update_idletasks()
 
     def select_chunk_details(self, item_id):
         """ if tree item selected is a media chunk (or equivalent 'run' for fragmented mp4) """
@@ -473,7 +416,17 @@ class MyApp(Tk):
             if len(box_selected.children) > 0:
                 my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.children])
         else:
-            my_string = "Element is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.element_position)
+            my_string = "Element {0:s} ({1:#x}) is {2:d} ({2:#x}) bytes from beginning of file.\n\n".format(
+                mkvanalyser.idlookups.id_table[box_selected.elementid]['name'], box_selected.elementid,
+                box_selected.element_position)
+            my_string += "Data Type: {0:s}\n".format(box_selected.type)
+            my_string += "Data Length: {0:d} bytes\n".format(box_selected.datasize)
+            my_string += "Data Value: " + f'{box_selected.datavalue}' + "\n\n"
+            my_string += mkvanalyser.idlookups.id_table[box_selected.elementid]['documentation']
+            if 'enum' in mkvanalyser.idlookups.id_table[box_selected.elementid]:
+                my_string += "\nEnumeration:\n"
+                for k, v in mkvanalyser.idlookups.id_table[box_selected.elementid]['enum'].items():
+                    my_string += "{0:d}, {1:s}\n".format(k, v)
         self.populate_text_widget(my_string)
 
     def populate_text_widget(self, the_string):

@@ -190,12 +190,7 @@ class Mp4File:
                                 mdat.sample_list.append(run_dict)
             i += 1
 
-    def read_bytes(self, offset, num_bytes):
-        with open(self.filename, 'rb') as f:
-            f.seek(offset)
-            bytes_read = f.read(num_bytes)
-        f.close()
-        return bytes_read
+
 
     def get_summary(self):
         if not self.summary:
