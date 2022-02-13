@@ -12,17 +12,15 @@ import os
 import logging
 import json
 import binascii
-import re
 from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
-# mp4 is the package that actually parses the mp4 file
-
-
+# mp4analyser is the package that actually parses the mp4 file
 import mp4analyser.iso
+# mkvanalyser is the package that parse tje matroska file
 import mkvanalyser.mkv
-import mkvanalyser.idlookups
+from mkvanalyser.idlookups import id_table
 
 try:
     from idlelib.redirector import WidgetRedirector
@@ -198,8 +196,8 @@ class MyApp(Tk):
 
     def open_file(self):
         """ Callback on selecting 'Open' from menu """
-        filename = filedialog.askopenfilename(filetypes=(("MP4 Files", ".mp4 .m4*"), ("MKV Files", ".mkv .webm"),
-                                                         ("All Files", "*.*")), initialdir=self.dialog_dir)
+        filename = filedialog.askopenfilename(filetypes=(("All Files", "*.*"), ("MP4 Files", ".mp4 .m4*"),
+                                                         ("MKV Files", ".mkv .webm")), initialdir=self.dialog_dir)
         if not(len(filename)):
             return
         logging.debug("Loading file " + filename)
@@ -207,7 +205,7 @@ class MyApp(Tk):
         self.update_idletasks()
         matroska = False
         with open(filename, 'rb') as f:
-            if f.read(4) == b'\x1a\x45\xdf\xa3':
+            if f.read(4) in (b'\x1a\x45\xdf\xa3', b'\x1f\x43\xb6\x75'):
                 matroska = True
         if matroska:
             self.populate_ui(mkvanalyser.mkv.MkvFile(filename))
@@ -239,8 +237,8 @@ class MyApp(Tk):
             if type(self.containerfile) ==  mp4analyser.iso.Mp4File:
                 return container.type
             else:
-                if container.elementid in mkvanalyser.idlookups.id_table:
-                    return mkvanalyser.idlookups.id_table[container.elementid]['name']
+                if container.elementid in id_table:
+                    return id_table[container.elementid]['name']
                 else:
                     return 'Unknown'
 
@@ -416,16 +414,20 @@ class MyApp(Tk):
             if len(box_selected.children) > 0:
                 my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.children])
         else:
+            name = id_table[box_selected.elementid]['name'] if box_selected.elementid in id_table else 'unknown'
             my_string = "Element {0:s} ({1:#x}) is {2:d} ({2:#x}) bytes from beginning of file.\n\n".format(
-                mkvanalyser.idlookups.id_table[box_selected.elementid]['name'], box_selected.elementid,
+                name, box_selected.elementid,
                 box_selected.element_position)
             my_string += "Data Type: {0:s}\n".format(box_selected.type)
             my_string += "Data Length: {0:d} bytes\n".format(box_selected.datasize)
-            my_string += "Data Value: " + f'{box_selected.datavalue}' + "\n\n"
-            my_string += mkvanalyser.idlookups.id_table[box_selected.elementid]['documentation']
-            if 'enum' in mkvanalyser.idlookups.id_table[box_selected.elementid]:
+            if box_selected.elementid == 0xA3:
+                my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.datavalue, indent=2))
+            else:
+                my_string += "Data Value: " + f'{box_selected.datavalue}' + "\n\n"
+            my_string += id_table[box_selected.elementid]['documentation'] if box_selected.elementid in id_table else ""
+            if box_selected.elementid in id_table and 'enum' in id_table[box_selected.elementid]:
                 my_string += "\nEnumeration:\n"
-                for k, v in mkvanalyser.idlookups.id_table[box_selected.elementid]['enum'].items():
+                for k, v in id_table[box_selected.elementid]['enum'].items():
                     my_string += "{0:d}, {1:s}\n".format(k, v)
         self.populate_text_widget(my_string)
 
