@@ -222,6 +222,7 @@ class MasterElement(MkvElement):
             # after calling superclass, fp will have advanced to the data i.e. the actual payload/data of the element
             start_of_element_data = fp.tell()
             unknown_datasize = False
+            end_of_file = False
             if self.datasize == 127 and self.datasizebytes == 1:
                 # special case of unknown datasize (all 1's)
                 unknown_datasize = True
@@ -242,16 +243,24 @@ class MasterElement(MkvElement):
                     last_known_end_of_child = fp.tell()
             else:
                 bytes_left = self.datasize
-                while bytes_left > 2:
+                while bytes_left > 2 and not end_of_file:
                     elementid_tuple = read_id(fp)
                     current_element = element_factory(fp, elementid_tuple, self)
                     self.children.append(current_element)
                     bytes_left -= current_element.elementidbytes + current_element.datasizebytes + current_element.datasize
+                    if len(fp.read(2)) != 2:
+                        end_of_file = True
+                    else:
+                        fp.seek(-2, 1)
+                    last_known_end_of_child = fp.tell()
         except DataLengthError:
             this_elementname = id_table[self.elementid]['name']
             logging.error(f'error in {this_elementname} around child {len(self.children)}')
+        except struct.error as err:
+            this_elementname = id_table[self.elementid]['name']
+            logging.error(f'struct.error in {this_elementname} around child {len(self.children)}')
         finally:
-            if unknown_datasize:
+            if unknown_datasize or end_of_file:
                 fp.seek(last_known_end_of_child)
             else:
                 fp.seek(start_of_element_data + self.datasize)
