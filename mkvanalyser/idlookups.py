@@ -31,7 +31,14 @@ XSLT 2.0 stylesheet was applied to above specs and output files merged by hand:
     </xsl:variable>
     <xsl:value-of select="concat('  ', @id, ': {''name'': ''', @name, ''',', codepoints-to-string(10))"/>
     <xsl:value-of select="concat('    ''type'': ''', @type, ''',', codepoints-to-string(10))"/>
-    <xsl:value-of select="concat('    ''level'': ', string-length(@path) - string-length(translate(@path, '\', '')) -1, ',', codepoints-to-string(10))"/>
+    <xsl:choose>
+        <xsl:when test="@id eq '0xBF' or @id eq '0xEC'">
+            <xsl:value-of select="concat('    ''level'': ', 7, ',', codepoints-to-string(10))"/>
+        </xsl:when>
+        <xsl:otherwise>
+            <xsl:value-of select="concat('    ''level'': ', string-length(@path) - string-length(translate(@path, '\', '')) -1, ',', codepoints-to-string(10))"/>
+        </xsl:otherwise>
+    </xsl:choose>
     <xsl:if test="@default">
         <xsl:value-of select="concat('    ''default'': ''', @default, ''',', codepoints-to-string(10))"/>
     </xsl:if>
@@ -51,11 +58,11 @@ XSLT 2.0 stylesheet was applied to above specs and output files merged by hand:
 id_table = {
   0xEC: {'name': 'Void',
          'type': 'binary',
-         'level': 0,
+         'level': 7,
          'documentation': 'definition:- Used to void damaged data, to avoid unexpected behaviors when using damaged data. The content is discarded. Also used to reserve space in a sub-element for later use.\n'},
   0xBF: {'name': 'CRC-32',
          'type': 'binary',
-         'level': 0,
+         'level': 7,
          'documentation': 'definition:- The CRC is computed on all the data of the Master element it''s in. The CRC element should be the first in it''s parent master for easier reading. All level 1 elements should include a CRC-32. The CRC in use is the IEEE CRC32 Little Endian.\n'},
   0x1A45DFA3: {'name': 'EBML',
                'type': 'master',
