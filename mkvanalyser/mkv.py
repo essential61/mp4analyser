@@ -253,16 +253,25 @@ class MasterElement(MkvElement):
             while bytes_left > 2 and not end_of_file:
                 elementid_tuple = read_id(fp)
                 # do tests here to check it's a permitted child before adding to master
-                if elementid_tuple[0] in id_table and (id_table[elementid_tuple[0]]['level'] > masterlevel):
-                    current_element = element_factory(fp, elementid_tuple, self)
-                    self.children.append(current_element)
-                    if not self.unknown_datasize:
+                if not self.unknown_datasize:
+                    if elementid_tuple[0] in id_table:
+                        # known master datasize and known child element
+                        current_element = element_factory(fp, elementid_tuple, self)
+                        self.children.append(current_element)
                         bytes_left -= current_element.elementidbytes + current_element.datasizebytes + current_element.datasize
+                    else:
+                        bytes_left -= elementid_tuple[1]
                 elif self.unknown_datasize:
-                    # read_id will advance the file pointer by 1 until a valid element is found
-                    pass
-                else:
-                     bytes_left -= elementid_tuple[1]
+                    if elementid_tuple[0] in id_table and id_table[elementid_tuple[0]]['level'] > masterlevel:
+                        # known master and known child
+                        current_element = element_factory(fp, elementid_tuple, self)
+                        self.children.append(current_element)
+                    elif elementid_tuple[0] in id_table:
+                        # known master and element not a valid child
+                        break
+                    else:
+                        # read_id will advance the file pointer by 1 until a valid element is found
+                        pass
                 if len(fp.read(2)) == 2:
                     fp.seek(-2, 1)
                 else:

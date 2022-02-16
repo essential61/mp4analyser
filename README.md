@@ -5,6 +5,8 @@ This project is a Python/TkInter application that can read and display the struc
 I believe the use of Python allows any technically-minded individual to add their own "box" definitions as required. 
 [See wiki](https://github.com/essential61/mp4analyser/wiki)
 
+Now able to parse files in Matroska or WebM format.
+
 It should work on any platform that can run a Python interpreter and support TKinter.
 
 # Screenshot #
