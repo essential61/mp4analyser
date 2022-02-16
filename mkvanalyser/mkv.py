@@ -4,6 +4,7 @@ mkv.py
 
 """
 import datetime
+import os
 import struct
 import logging
 import binascii
@@ -62,7 +63,7 @@ def read_id(fp):
     elif leftmostbyte > 15:
         return (leftmostbyte << 24) + struct.unpack('>I', b'\x00' + fp.read(3))[0], 4
     else:
-        return 0, 0
+        return 0, 1
 
 
 def read_vint(fp):
@@ -106,17 +107,27 @@ class MkvFile:
         self.summary = {}
         with open(filename, 'rb') as f:
             end_of_file = False
+            # find size of file
+            old_file_position = f.tell()
+            f.seek(0, os.SEEK_END)
+            self.datasize = f.tell()
+            f.seek(old_file_position, os.SEEK_SET)
             try:
                 while not end_of_file:
                     elementid_tuple = read_id(f)
-                    current_element = element_factory(f, elementid_tuple, self)
-                    self.children.append(current_element)
+                    if elementid_tuple[0] in id_table:
+                        current_element = element_factory(f, elementid_tuple, self)
+                        self.children.append(current_element)
                     if len(f.read(4)) != 4:
                         end_of_file = True
                     else:
                         f.seek(-4, 1)
-            except Exception as e:
-                logging.error(f'error in {filename} after child {len(self.children)}')
+            except DataLengthError:
+                logging.error(f'data length error in {self.filename} after child {len(self.children)}')
+            except struct.error as err:
+                logging.error(f'struct.error in {self.filename} after child {len(self.children)}')
+            #except Exception as e:
+            #    logging.error(f'error in {filename} after child {len(self.children)}')
 
         f.close()
 
@@ -145,14 +156,14 @@ class MkvElement():
         self.children = []
         self.datavalue = None
 
-    def _get_file(self):
+    def get_file(self):
         if isinstance(self.parent, MkvFile):
             return self.parent
         else:
-            return self.parent._get_file()
+            return self.parent.get_file()
 
     def get_bytes(self):
-        myfile = self._get_file()
+        myfile = self.get_file()
         num_bytes = self.elementidbytes + self.datasizebytes + self.datasize
         # Truncate if over 100000
         if num_bytes > 100000:
@@ -163,8 +174,7 @@ class MkvElement():
 class UnhandledElement(MkvElement):
 
     def __init__(self, fp, elementid, parent):
-        """ Gets called if element id is unknown (usually a corrupted file),
-         side effect of initializer is to advance file pointer """
+        """ This should never get called """
         super().__init__(fp, elementid, parent)
         try:
             start_of_element_data = fp.tell()
@@ -235,7 +245,7 @@ class MasterElement(MkvElement):
             # after calling superclass, fp will have advanced to the data i.e. the actual payload/data of the element
             start_of_element_data = last_known_end_of_child = fp.tell()
             # special case of unknown datasize (1 byte, all 1's)
-            unknown_datasize = True if self.datasize == 127 and self.datasizebytes == 1 else False
+            self.unknown_datasize = True if self.datasize == 127 and self.datasizebytes == 1 else False
             bytes_left = self.datasize  # bytes left is only useful if size known
             end_of_file = False
             masterlevel = id_table[self.elementid]['level']
@@ -245,9 +255,9 @@ class MasterElement(MkvElement):
                 if elementid_tuple[0] in id_table and id_table[elementid_tuple[0]]['level'] > masterlevel:
                     current_element = element_factory(fp, elementid_tuple, self)
                     self.children.append(current_element)
-                    if not unknown_datasize:
+                    if not self.unknown_datasize:
                         bytes_left -= current_element.elementidbytes + current_element.datasizebytes + current_element.datasize
-                elif unknown_datasize:
+                elif self.unknown_datasize:
                     break
                 else:
                      bytes_left -= elementid_tuple[1]
@@ -263,7 +273,7 @@ class MasterElement(MkvElement):
             this_elementname = id_table[self.elementid]['name']
             logging.error(f'struct.error in {this_elementname} after child {len(self.children)}')
         finally:
-            if unknown_datasize or end_of_file:
+            if self.unknown_datasize or end_of_file:
                 fp.seek(last_known_end_of_child)
             else:
                 fp.seek(start_of_element_data + self.datasize)
@@ -297,7 +307,8 @@ class UintegerElement(MkvElement):
             elif self.datasize <= 8:
                 self.datavalue = struct.unpack('>Q', bytearray(8 - self.datasize) + fp.read(self.datasize))[0]
             else:
-                logging.error(f'data length error {self.datasize } in {self.elementid:0x}')
+                this_elementname = id_table[self.elementid]['name']
+                logging.error(f'data length error {self.datasize} in {this_elementname} around position {fp.tell() -1} in {self.get_file().filename}')
                 raise DataLengthError
         finally:
             fp.seek(start_of_element_data + self.datasize)
@@ -316,7 +327,8 @@ class IntegerElement(MkvElement):
                 padbyte = b'\x00' if int(bytesread[0]) < 128 else b'\xff'
                 self.datavalue = struct.unpack('>q', bytearray(padbyte * (8 - self.datasize)) + bytesread)[0]
             else:
-                logging.error(f'data length error {self.datasize } in {self.elementid:0x}')
+                this_elementname = id_table[self.elementid]['name']
+                logging.error(f'data length error {self.datasize} in {this_elementname} around position {fp.tell() -1} in {self.get_file().filename}')
                 raise DataLengthError
         finally:
             fp.seek(start_of_element_data + self.datasize)
@@ -338,7 +350,8 @@ class DateElement(MkvElement):
                 self.datavalue = (datetime.datetime(2001, 1, 1
                                                 ) + datetime.timedelta(microseconds=timedelta / 1000)).isoformat()
             else:
-                logging.error(f'data length error {self.datasize } in {self.elementid:0x}')
+                this_elementname = id_table[self.elementid]['name']
+                logging.error(f'data length error {self.datasize} in {this_elementname} around position {fp.tell() - 1} in {self.get_file().filename}')
                 raise DataLengthError
         finally:
             fp.seek(start_of_element_data + self.datasize)
@@ -357,7 +370,8 @@ class FloatElement(MkvElement):
             elif self.datasize == 8:
                 self.datavalue = struct.unpack('>d', fp.read(8))[0]
             else:
-                logging.error(f'data length error {self.datasize } in {self.elementid:0x}')
+                this_elementname = id_table[self.elementid]['name']
+                logging.error(f'data length error {self.datasize} in {this_elementname} around position {fp.tell() - 1} in {self.get_file().filename}')
                 raise DataLengthError
         finally:
             fp.seek(start_of_element_data + self.datasize)
