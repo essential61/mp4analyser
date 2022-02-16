@@ -153,6 +153,7 @@ class MkvElement():
         self.parent = parent
         self.element_position = fp.tell() - self.elementidbytes
         (self.datasize, self.datasizebytes) = read_vint(fp)
+        self.unknown_datasize = False
         self.children = []
         self.datavalue = None
 
@@ -252,13 +253,14 @@ class MasterElement(MkvElement):
             while bytes_left > 2 and not end_of_file:
                 elementid_tuple = read_id(fp)
                 # do tests here to check it's a permitted child before adding to master
-                if elementid_tuple[0] in id_table and id_table[elementid_tuple[0]]['level'] > masterlevel:
+                if elementid_tuple[0] in id_table and (id_table[elementid_tuple[0]]['level'] > masterlevel):
                     current_element = element_factory(fp, elementid_tuple, self)
                     self.children.append(current_element)
                     if not self.unknown_datasize:
                         bytes_left -= current_element.elementidbytes + current_element.datasizebytes + current_element.datasize
                 elif self.unknown_datasize:
-                    break
+                    # read_id will advance the file pointer by 1 until a valid element is found
+                    pass
                 else:
                      bytes_left -= elementid_tuple[1]
                 if len(fp.read(2)) == 2:
@@ -274,6 +276,7 @@ class MasterElement(MkvElement):
             logging.error(f'struct.error in {this_elementname} after child {len(self.children)}')
         finally:
             if self.unknown_datasize or end_of_file:
+                self.datasize = fp.tell() - start_of_element_data
                 fp.seek(last_known_end_of_child)
             else:
                 fp.seek(start_of_element_data + self.datasize)
