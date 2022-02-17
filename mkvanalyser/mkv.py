@@ -191,16 +191,27 @@ class BinaryElement(MkvElement):
         super().__init__(fp, elementid, parent)
         try:
             start_of_element_data = fp.tell()
-            if self.elementid == 0xA3:
-                # It's a SimpleBlock, we'll decode the header
+            if self.elementid in [0xA1, 0xA3]:
+                # It's a Block or SimpleBlock, we'll decode the header
                 (trackentry, ignore) = read_vint(fp)
                 self.datavalue = {'trackentry': trackentry, 'timestamp':struct.unpack('>h', fp.read(2))[0]}
                 blockheaderflags = struct.unpack('>B', fp.read(1))[0]
                 self.datavalue['blockheaderflags'] = f'{blockheaderflags:08b}'
-                self.datavalue['keyframe'] = True if (blockheaderflags & 0x80) else False
+                if self.elementid == 0xA3:
+                    self.datavalue['keyframe'] = True if (blockheaderflags & 0x80) else False
+                    self.datavalue['discardable'] = True if (blockheaderflags & 0x01) else False
                 self.datavalue['invisible'] = True if (blockheaderflags & 0x10) else False
                 if (blockheaderflags & 0x06) == 2:
                     self.datavalue['lacing'] = 'xiph'
+                    self.datavalue['frames'] = struct.unpack('>B', fp.read(1))[0] + 1
+                    self.datavalue['frame lengths'] = []
+                    for frame_size in range(self.datavalue['frames'] - 1):
+                        this_frame_sz = 0
+                        while struct.unpack('>B', fp.read(1))[0] == 0xFF:
+                            this_frame_sz += 0xFF
+                        self.datavalue['frame lengths'].append( this_frame_sz + struct.unpack('>B', fp.read(1))[0])
+                    last_sz = self.datasize - sum(self.datavalue['frame lengths']) - (fp.tell() - start_of_element_data)
+                    self.datavalue['frame lengths'].append(last_sz)
                 elif (blockheaderflags & 0x06) == 6:
                     self.datavalue['lacing'] = 'ebml'
                     self.datavalue['frames'] = struct.unpack('>B', fp.read(1))[0] + 1
@@ -263,20 +274,20 @@ class MasterElement(MkvElement):
                         bytes_left -= elementid_tuple[1]
                 elif self.unknown_datasize:
                     if elementid_tuple[0] in id_table and id_table[elementid_tuple[0]]['level'] > masterlevel:
-                        # known master and known child
+                        # known valid child
                         current_element = element_factory(fp, elementid_tuple, self)
                         self.children.append(current_element)
+                        last_known_end_of_child = fp.tell()
                     elif elementid_tuple[0] in id_table:
-                        # known master and element not a valid child
+                        # valid element but not a valid child
                         break
                     else:
-                        # read_id will advance the file pointer by 1 until a valid element is found
+                        # read_id will advance the file pointer until a valid element is found
                         pass
                 if len(fp.read(2)) == 2:
                     fp.seek(-2, 1)
                 else:
                     end_of_file = True
-                last_known_end_of_child = fp.tell()
         except DataLengthError:
             this_elementname = id_table[self.elementid]['name']
             logging.error(f'data length error in {this_elementname} after child {len(self.children)}')

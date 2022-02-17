@@ -423,7 +423,7 @@ class MyApp(Tk):
                 my_string += "Data Length: Unknown\n"
             else:
                 my_string += "Data Length: {0:d} bytes\n".format(box_selected.datasize)
-            if box_selected.elementid == 0xA3:
+            if box_selected.elementid in [0xA1, 0xA3]:
                 my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.datavalue, indent=2))
             else:
                 my_string += "Data Value: " + f'{box_selected.datavalue}' + "\n\n"
