@@ -126,9 +126,8 @@ class MkvFile:
                 logging.error(f'data length error in {self.filename} after child {len(self.children)}')
             except struct.error as err:
                 logging.error(f'struct.error in {self.filename} after child {len(self.children)}')
-            #except Exception as e:
-            #    logging.error(f'error in {filename} after child {len(self.children)}')
-
+            except Exception as e:
+                logging.exception(f'error in {filename} after child {len(self.children)}')
         f.close()
 
     def read_bytes(self, offset, num_bytes):

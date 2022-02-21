@@ -52,21 +52,25 @@ class Mp4File:
         self.type = 'file'
         self.children = []
         self.summary= {}
-        with open(filename, 'rb') as f:
-            end_of_file = False
-            while not end_of_file:
-                current_header = Header(f)
-                current_box = box_factory(f, current_header, self)
-                self.children.append(current_box)
-                if current_box.size == 0:
-                    end_of_file = True
-                if len(f.read(4)) != 4:
-                    end_of_file = True
-                else:
-                    f.seek(-4, 1)
-        f.close()
-        self._generate_samples_from_moov()
-        self._generate_samples_from_moofs()
+        try:
+            with open(filename, 'rb') as f:
+                end_of_file = False
+                while not end_of_file:
+                    current_header = Header(f)
+                    current_box = box_factory(f, current_header, self)
+                    self.children.append(current_box)
+                    if current_box.size == 0:
+                        end_of_file = True
+                    if len(f.read(4)) != 4:
+                        end_of_file = True
+                    else:
+                        f.seek(-4, 1)
+            f.close()
+            self._generate_samples_from_moov()
+            self._generate_samples_from_moofs()
+        except Exception as e:
+            # catch exception in case we can continue
+            logging.exception(f'error in {filename} after child {len(self.children)}')
 
     def _generate_samples_from_moov(self):
         """ identify media samples in mdat for full mp4 file """
@@ -190,7 +194,12 @@ class Mp4File:
                                 mdat.sample_list.append(run_dict)
             i += 1
 
-
+    def read_bytes(self, offset, num_bytes):
+        with open(self.filename, 'rb') as f:
+            f.seek(offset)
+            bytes_read = f.read(num_bytes)
+        f.close()
+        return bytes_read
 
     def get_summary(self):
         if not self.summary:
