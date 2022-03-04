@@ -269,6 +269,7 @@ class MasterElement(MkvElement):
                         current_element = element_factory(fp, elementid_tuple, self)
                         self.children.append(current_element)
                         bytes_left -= current_element.elementidbytes + current_element.datasizebytes + current_element.datasize
+                        last_known_end_of_child = fp.tell()
                     else:
                         bytes_left -= elementid_tuple[1]
                 elif self.unknown_datasize:
