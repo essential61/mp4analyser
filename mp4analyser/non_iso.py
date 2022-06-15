@@ -573,6 +573,48 @@ class IodsBox(Mp4FullBox):
         finally:
             fp.seek(self.start_of_box + self.size)
 
+class Tx3gBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['displayFlags'] = read_u32(fp)
+            self.box_info['horizontal_justification'] = read_i8(fp)
+            self.box_info['vertical_justification'] = read_i8(fp)
+            self.box_info['background_color_rgba'] = {'red': read_u8(fp), 'green': read_u8(fp), 'blue': read_u8(fp), 'alpha': read_u8(fp)}
+            read_u32(fp)
+            self.box_info['default_text_box'] = {'top': read_i16(fp), 'left': read_i16(fp), 'bottom': read_i16(fp), 'right': read_i16(fp)}
+            self.box_info['default_style'] = {
+                'startChar': read_u16(fp),
+                'endChar': read_u16(fp),
+                'font_ID': read_u16(fp),
+                'face_style_flags': read_u8(fp),
+                'font_size': read_u8(fp)
+            }
+            self.box_info['text_color_rgba'] = {'red': read_u8(fp), 'green': read_u8(fp), 'blue': read_u8(fp), 'alpha': read_u8(fp)}
+            current_header = Header(fp)
+            current_box = mp4analyser.iso.box_factory(fp, current_header, self)
+            self.children.append(current_box)
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+class FtabBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['entry_count'] = read_u16(fp)
+            self.box_info['entry_list'] = []
+            for i in range(self.box_info['entry_count']):
+                fontID = read_u16(fp)
+                fnl = read_u8(fp)
+                self.box_info['entry_list'].append({
+                    'font_ID': fontID,
+                    'font_name_length': fnl,
+                    'font_name': fp.read(fnl).decode('utf-8')
+                })
+        finally:
+            fp.seek(self.start_of_box + self.size)
 
 class XyzBox(Mp4Box):
 
