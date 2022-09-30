@@ -83,7 +83,7 @@ class MyApp(Tk):
 
         # create tabbed notebook
         self.nb = ttk.Notebook(self)
-        self.nb.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.nb.grid(column=0, row=0, sticky=N+W+E+S)
 
         # create left-right paned window and add to tabbed notebook
         self.p = ttk.Panedwindow(self.nb, orient=HORIZONTAL)
@@ -91,23 +91,23 @@ class MyApp(Tk):
 
         # create top-bottom paned window
         self.p1 = ttk.Panedwindow(self.p, orient=VERTICAL)
-        self.p1.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.p1.grid(column=0, row=0, sticky=N+W+E+S)
 
         # first pane shown on left:
         self.f1 = ttk.Labelframe(self.p, text='Box Hierarchy')
-        self.f1.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.f1.grid(column=0, row=0, sticky=N+W+E+S)
         self.f1.columnconfigure(0, weight=1)
         self.f1.rowconfigure(0, weight=1)
 
         # box details shown top right
         self.f2 = ttk.Labelframe(self.p1, text='Box Details', width=750, )  # second pane
-        self.f2.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.f2.grid(column=0, row=0, sticky=N+W+E+S)
         self.f2.columnconfigure(0, weight=1)
         self.f2.rowconfigure(0, weight=1)
 
         # hex view shown bottom right
         self.f3 = ttk.Labelframe(self.p1, text='Hex View', width=750, )  # second pane
-        self.f3.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.f3.grid(column=0, row=0, sticky=N+W+E+S)
         self.f3.columnconfigure(0, weight=1)
         self.f3.rowconfigure(0, weight=1)
 
@@ -119,41 +119,46 @@ class MyApp(Tk):
 
         # tree view showing box hierarchy
         self.tree = ttk.Treeview(self.f1, show="tree")
-        self.tree.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.tree.grid(column=0, row=0, sticky=N+W+E+S)
         self.tree.column("#0", width=300)
 
         # Sub-classed auto hiding scroll bar
         self.scroll1 = AutoScrollbar(self.f1, orient=VERTICAL, command=self.tree.yview)
-        self.scroll1.grid(column=1, row=0, sticky=(N, S))
+        self.scroll1.grid(column=1, row=0, sticky=N+S)
         self.tree['yscrollcommand'] = self.scroll1.set
         self.tree.bind('<ButtonRelease-1>', self.select_box)
 
         # text widget display details of selected box
         self.t = ReadOnlyText(self.f2, state='normal', width=120, height=24, wrap='none')
-        self.t.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.t.grid(column=0, row=0, sticky=N+W+E+S)
         self.t.bind('<ButtonRelease-1>', self.check_if_selection)
         self.t.bind("<Button-3>", self.popup_sel)
 
         # Sub-classed auto hiding scroll bar
         self.scroll2 = AutoScrollbar(self.f2, orient=VERTICAL, command=self.t.yview)
-        self.scroll2.grid(column=1, row=0, sticky=(N, S))
+        self.scroll2.grid(column=1, row=0, sticky=N+S)
         self.t['yscrollcommand'] = self.scroll2.set
+
+        # Sub-classed auto hiding scroll bar
+        self.scroll3 = AutoScrollbar(self.f2, orient=HORIZONTAL, command=self.t.xview)
+        self.scroll3.grid(column=0, row=1, sticky=W+E)
+        self.t['xscrollcommand'] = self.scroll3.set
 
         # text widget displaying hex
         self.thex = ReadOnlyText(self.f3, state='normal', width=120, height=15, wrap='none')
-        self.thex.grid(column=0, row=0, sticky=(N, W, E, S))
+        self.thex.grid(column=0, row=0, sticky=N+W+E+S)
         self.thex.bind('<ButtonRelease-1>', self.check_if_selection)
         self.thex.bind("<Button-3>", self.popup_sel)
 
         # Sub-classed auto hiding scroll bar
-        self.scroll3 = AutoScrollbar(self.f3, orient=VERTICAL, command=self.thex.yview)
-        self.scroll3.grid(column=1, row=0, sticky=(N, S))
-        self.thex['yscrollcommand'] = self.scroll3.set
+        self.scroll4 = AutoScrollbar(self.f3, orient=VERTICAL, command=self.thex.yview)
+        self.scroll4.grid(column=1, row=0, sticky=N+S)
+        self.thex['yscrollcommand'] = self.scroll4.set
 
         # Sub-classed auto hiding scroll bar
-        self.scroll4 = AutoScrollbar(self.f3, orient=HORIZONTAL, command=self.thex.xview)
-        self.scroll4.grid(column=0, row=1, sticky=(W, E))
-        self.thex['xscrollcommand'] = self.scroll4.set
+        self.scroll5 = AutoScrollbar(self.f3, orient=HORIZONTAL, command=self.thex.xview)
+        self.scroll5.grid(column=0, row=1, sticky=W+E)
+        self.thex['xscrollcommand'] = self.scroll5.set
 
         # create a frame and as second tab to notebook
         self.f4 = ttk.Frame(self.nb)
@@ -187,7 +192,7 @@ class MyApp(Tk):
         self.statustext = StringVar()
         self.statustext.set("")
         self.status = Label(self, textvariable=self.statustext, bd=1, anchor=W)
-        self.status.grid(column=0, row=1, columnspan=2, sticky=(W, E, S))
+        self.status.grid(column=0, row=1, columnspan=2, sticky=W+E+S)
 
         # set ratios of panes
         self.update_idletasks()
