@@ -398,15 +398,22 @@ class ElstBox(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['entry_count'] = read_u32(fp)
+            self.box_info['entry_list'] = []
             for i in range(self.box_info['entry_count']):
                 if self.version == 1:
-                    self.box_info['segment_duration'] = read_u64(fp)
-                    self.box_info['media_time'] = read_i64(fp)
+                    self.box_info['entry_list'].append({
+                        'segment_duration': read_u64(fp),
+                        'media_time': read_i64(fp),
+                        'media_rate_integer': read_i16(fp),
+                        'media_rate_fraction': read_i16(fp)
+                    })
                 else:
-                    self.box_info['segment_duration'] = read_u32(fp)
-                    self.box_info['media_time'] = read_i32(fp)
-                self.box_info['media_rate_integer'] = read_i16(fp)
-            self.box_info['media_rate_fraction'] = read_i16(fp)
+                    self.box_info['entry_list'].append({
+                        'segment_duration': read_u32(fp),
+                        'media_time': read_i32(fp),
+                        'media_rate_integer': read_i16(fp),
+                        'media_rate_fraction': read_i16(fp)
+                    })
         finally:
             fp.seek(self.start_of_box + self.size)
 
