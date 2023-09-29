@@ -16,6 +16,9 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter import messagebox
 from tkinter import ttk
+
+import sys
+sys.path.append(os.path.dirname(__file__))
 # mp4analyser is the package that actually parses the mp4 file
 import mp4analyser.iso
 # mkvanalyser is the package that parse tje matroska file
