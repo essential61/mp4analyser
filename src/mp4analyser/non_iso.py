@@ -69,7 +69,7 @@ class Avc1Box(Mp4FullBox):
 DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
 Hvc1Box = Hev1Box = Av01Box = Avc1Box
 Avc4Box = Avc3Box = Avc2Box = Mp4vBox = Avc1Box
-EncvBox = Avc1Box
+EncvBox = Vvi1Box = Vvc1Box = Avc1Box
 
 
 class AvccBox(Mp4Box):
@@ -186,6 +186,96 @@ class Av1cBox(Mp4Box):
                 self.box_info['initial_presentation_delay_minus_1'] = fourth_byte & 0x0f
             bytes_left = self.size - self.header.header_size - 4
             self.box_info['configOBUs'] = binascii.b2a_hex(fp.read(bytes_left)).decode('utf-8')
+        finally:
+            fp.seek(self.start_of_box + self.size)
+
+
+class VvccBox(Mp4FullBox):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            first_byte = read_u8(fp)
+            vdcr = {'lengthSizeMinusOne': (first_byte >> 1) & 0x3}
+            vdcr['ptl_present_flag'] = first_byte & 0x01
+            if vdcr['ptl_present_flag']:
+                next2bytes = read_u16(fp)
+                vdcr['ols_idx'] = next2bytes >> 7
+                vdcr['num_sublayers'] = (next2bytes >> 4) & 0x7
+                vdcr['constant_frame_rate'] = (next2bytes >> 2) & 0x3
+                vdcr['chroma_format_idc'] = next2bytes & 0x3
+
+                nextbyte = read_u8(fp)
+                vdcr['depth_minus8'] = nextbyte >> 5
+
+                nextbyte = read_u8(fp)
+                ptlRec = {'num_bytes_constraint_info': nextbyte & 0x3f}
+
+                nextbyte = read_u8(fp)
+                ptlRec['general_profile_idc'] = nextbyte >> 1
+                ptlRec['general_tier_flag'] = nextbyte & 0x1
+
+                ptlRec['general_level_idc'] = read_u8(fp)
+
+                nextbyte = read_u8(fp)
+                ptlRec['ptl_frame_only_constraint_flag'] = (nextbyte & 0x80) >> 7
+                ptlRec['ptl_multilayer_enabled_flag'] = (nextbyte & 0x40) >> 6
+
+                if ptlRec['num_bytes_constraint_info']:
+                    ptlRec['general_constraint_info'] = []
+                    '  "bytes" are not byte-aligned? '
+                    for i in range(ptlRec['num_bytes_constraint_info'] - 1):
+                        leftbits = (nextbyte & 0x3f) << 2
+                        nextbyte = read_u8(fp)
+                        rightbits = (nextbyte & 0xc0) >> 2
+                        ptlRec['general_constraint_info'].append(leftbits | rightbits)
+                    ptlRec['general_constraint_info'].append(nextbyte & 0x2f)
+
+                if vdcr['num_sublayers'] > 1:
+                    nextbyte = read_u8(fp)
+                    ptlRec['ptl_sublayer_present_mask'] = nextbyte >> (9 - vdcr['num_sublayers'])
+
+                    ptlRec['sublayer_level_idc'] = []
+                    for j in range(vdcr['num_sublayers'] - 2, -1, -1):
+                        if ptlRec['ptl_sublayer_present_mask'] & (1 << j):
+                            ptlRec['sublayer_level_idc'] = [read_u8(fp)] + ptlRec['sublayer_level_idc']
+
+                ptlRec['ptl_num_sub_profiles'] = read_u8(fp)
+                ptlRec['general_sub_profile_idc'] = [];
+                if ptlRec['ptl_num_sub_profiles']:
+                    for i in range(ptlRec['ptl_num_sub_profiles']):
+                        ptlRec['general_sub_profile_idc'].append(read_u32(fp))
+
+                vdcr['VvcPTLRecord'] =  ptlRec
+                vdcr['max_picture_width'] = read_u16(fp)
+                vdcr['max_picture_height'] = read_u16(fp)
+                vdcr['avg_frame_rate'] = read_u16(fp)
+
+                self.box_info['VvcDecoderConfigurationRecord'] = vdcr
+
+            VVC_NALU_OPI = 12
+            VVC_NALU_DEC_PARAM = 13
+            self.box_info['num_of_arrays'] = read_u8(fp)
+            self.box_info['arrays'] = []
+            for i in range(self.box_info['num_of_arrays']):
+                nalu_dict = {}
+                nextbyte = read_u8(fp);
+                nalu_dict['completeness'] = (nextbyte & 0x80) >> 7
+                nalu_dict['nalu_type'] = nextbyte & 0x1f
+
+                numNalus = 1
+                if (nalu_dict['nalu_type'] != VVC_NALU_DEC_PARAM and nalu_dict['nalu_type'] != VVC_NALU_OPI):
+                    numNalus = read_u16(fp)
+                    nalu_dict['num_nalus'] = numNalus
+
+                nalu_dict['nalu_array'] = []
+                for j in range(numNalus):
+                    len = read_u16(fp)
+                    data = fp.read(len)
+                    this_item = { 'len': len, 'data': binascii.b2a_hex(data).decode('utf-8')}
+                    nalu_dict['nalu_array'].append(this_item)
+
+                self.box_info['arrays'].append(nalu_dict)
         finally:
             fp.seek(self.start_of_box + self.size)
 
