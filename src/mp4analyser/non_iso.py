@@ -236,9 +236,9 @@ class VvccBox(Mp4FullBox):
                     ptlRec['ptl_sublayer_present_mask'] = nextbyte >> (9 - vdcr['num_sublayers'])
 
                     ptlRec['sublayer_level_idc'] = []
-                    for j in range(vdcr['num_sublayers'] - 2, -1, -1):
+                    for j in range(vdcr['num_sublayers'] - 1):
                         if ptlRec['ptl_sublayer_present_mask'] & (1 << j):
-                            ptlRec['sublayer_level_idc'] = [read_u8(fp)] + ptlRec['sublayer_level_idc']
+                            ptlRec['sublayer_level_idc'].append(read_u8(fp))
 
                 ptlRec['ptl_num_sub_profiles'] = read_u8(fp)
                 ptlRec['general_sub_profile_idc'] = [];
