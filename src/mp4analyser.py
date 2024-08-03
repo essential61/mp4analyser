@@ -224,6 +224,16 @@ class MyApp(Tk):
         self.statustext.set("")
         self.update_idletasks()
 
+    def item_string(self, container):
+        '''  item_string returns appropriate container type depending on whether file is mp4 or matroska '''
+        if type(self.containerfile) == mp4analyser.iso.Mp4File:
+            return container.type
+        else:
+            if container.elementid in id_table:
+                return id_table[container.elementid]['name']
+            else:
+                return 'Unknown'
+
     def populate_ui(self, new_file):
         # sanity check that it is a valid file
         if (len(new_file.children) == 0) or (
@@ -241,62 +251,21 @@ class MyApp(Tk):
         self.tsum.delete(1.0, END)
         self.tsum.insert(END, json.dumps(self.containerfile.get_summary(), indent=2))
 
-        def item_string(container):
-            if type(self.containerfile) ==  mp4analyser.iso.Mp4File:
-                return container.type
-            else:
-                if container.elementid in id_table:
-                    return id_table[container.elementid]['name']
-                else:
-                    return 'Unknown'
-
         # Now fill tree with new contents
         for l0, this_box in enumerate(self.containerfile.children):
-            self.tree.insert('', 'end', str(l0), text=str(l0) + " " + item_string(this_box), open=TRUE)
-            for l1, this_box in enumerate(this_box.children):
-                l1_iid = "{0}.{1}".format(l0, l1)
-                self.tree.insert(str(l0), 'end', l1_iid, text=l1_iid + " " + item_string(this_box), open=TRUE)
-                for l2, this_box in enumerate(this_box.children):
-                    l2_iid = "{0}.{1}.{2}".format(l0, l1, l2)
-                    self.tree.insert(l1_iid, 'end', l2_iid, text=l2_iid + " " + item_string(this_box), open=TRUE)
-                    for l3, this_box in enumerate(this_box.children):
-                        l3_iid = "{0}.{1}.{2}.{3}".format(l0, l1, l2, l3)
-                        self.tree.insert(l2_iid, 'end', l3_iid, text=l3_iid + " " + item_string(this_box), open=TRUE)
-                        for l4, this_box in enumerate(this_box.children):
-                            l4_iid = "{0}.{1}.{2}.{3}.{4}".format(l0, l1, l2, l3, l4)
-                            self.tree.insert(l3_iid, 'end', l4_iid, text=l4_iid + " " + item_string(this_box), open=TRUE)
-                            for l5, this_box in enumerate(this_box.children):
-                                l5_iid = "{0}.{1}.{2}.{3}.{4}.{5}".format(l0, l1, l2, l3, l4, l5)
-                                self.tree.insert(l4_iid, 'end', l5_iid, text=l5_iid + " " + item_string(this_box), open=TRUE)
-                                for l6, this_box in enumerate(this_box.children):
-                                    l6_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}".format(l0, l1, l2, l3, l4, l5, l6)
-                                    self.tree.insert(l5_iid, 'end', l6_iid, text=l6_iid + " " + item_string(this_box),
-                                                     open=TRUE)
-                                    for l7, this_box in enumerate(this_box.children):
-                                        l7_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}".format(l0, l1, l2, l3, l4, l5, l6,
-                                                                                          l7)
-                                        self.tree.insert(l6_iid, 'end', l7_iid, text=l7_iid + " " + item_string(this_box),
-                                                         open=TRUE)
-                                        for l8, this_box in enumerate(this_box.children):
-                                            l8_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}".format(l0, l1, l2, l3, l4, l5,
-                                                                                              l6,
-                                                                                              l7,
-                                                                                              l8)
-                                            self.tree.insert(l7_iid, 'end',
-                                                             l8_iid, text=l8_iid + " " + item_string(this_box),
-                                                             open=TRUE)
-                                            for l9, this_box in enumerate(this_box.children):
-                                                l9_iid = "{0}.{1}.{2}.{3}.{4}.{5}.{6}.{7}.{8}.{9}".format(l0, l1, l2, l3,
-                                                                                                      l4, l5,
-                                                                                                      l6,
-                                                                                                      l7,
-                                                                                                      l8,
-                                                                                                      l9)
-                                                self.tree.insert(l8_iid, 'end', l9_iid,
-                                                                 text=l9_iid + " " + item_string(this_box),
-                                                                 open=TRUE)
+            self.tree.insert('', 'end', str(l0), text=str(l0) + " " + self.item_string(this_box), open=TRUE)
+            self.walk_the_boxes(this_box, [l0])
         logging.debug("Summary " + json.dumps(self.containerfile.get_summary(), indent=2))
         logging.debug("Finished populating " + self.containerfile.filename)
+
+    def walk_the_boxes(self, parent_box, parent_tree_index):
+        ''' populate the tree view widget using recursion '''
+        parent_item = '.'.join([str(indice) for indice in parent_tree_index])
+        for i, this_box in enumerate(parent_box.children):
+            this_item = parent_item + '.' + str(i)
+            self.tree.insert(parent_item, 'end', this_item, text=this_item + " " + self.item_string(this_box), open=TRUE)
+            tree_index = parent_tree_index + [i]
+            self.walk_the_boxes(this_box, tree_index)
 
     def select_box(self, a):
         """ Callback on selecting an Mp4 box in treeview """
