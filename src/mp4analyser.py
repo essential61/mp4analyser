@@ -311,6 +311,14 @@ class MyApp(Tk):
         num_bytes = sample_dict['size']
         self.populate_hex_text_widget(self.containerfile.read_bytes(byte_offset, num_bytes))
 
+    def get_descendant(self, parent_box, tree_index):
+        """ walk down the tree to get selected box """
+        if len(tree_index) > 1:
+            new_parent_box = parent_box.children[tree_index.pop(0)]
+            return self.get_descendant(new_parent_box, tree_index)
+        else:
+            return parent_box.children[tree_index[0]]
+
     def select_box_details(self, item_id):
         """ if tree item selected is 'box' or 'atom' """
         # item id is in the form  n.n.n as text
@@ -321,31 +329,10 @@ class MyApp(Tk):
             # specific case of mdat box selected and chunks/samples in mdat not yet loaded in tree
             if box_selected.type == 'mdat' and box_selected.sample_list and not self.tree.get_children(item_id):
                 self.populate_tree_with_samples_in_mdat(item_id)
-        elif len(l) == 2:
-            box_selected = self.containerfile.children[l[0]].children[l[1]]
-        elif len(l) == 3:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]]
-        elif len(l) == 4:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[l[3]]
-        elif len(l) == 5:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[
-                l[3]].children[l[4]]
-        elif len(l) == 6:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[
-                l[3]].children[l[4]].children[l[5]]
-        elif len(l) == 7:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[
-                l[3]].children[l[4]].children[l[5]].children[l[6]]
-        elif len(l) == 8:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[
-                l[3]].children[l[4]].children[l[5]].children[l[6]].children[l[7]]
-        elif len(l) == 9:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[
-                l[3]].children[l[4]].children[l[5]].children[l[6]].children[l[7]].children[l[8]]
-        elif len(l) == 10:
-            box_selected = self.containerfile.children[l[0]].children[l[1]].children[l[2]].children[
-                l[3]].children[l[4]].children[l[5]].children[l[6]].children[l[7]].children[
-                l[8]].children[l[9]]
+        elif len(l) > 1:
+            box_selected = self.get_descendant(self.containerfile.children[l.pop(0)], l)
+        else:
+            logging.debug("This shouldn't happen")
         logging.debug("Populating text widgets")
         self.prepare_string_for_text_widget(box_selected)
         logging.debug("Upper text widget populated")
