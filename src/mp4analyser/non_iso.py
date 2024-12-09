@@ -7,6 +7,7 @@ https://developer.apple.com/library/archive/documentation/QuickTime/QTFF/QTFFCha
 
 """
 import binascii
+import os
 
 import mp4analyser.iso
 import mp4analyser.mpeglookups
@@ -44,12 +45,12 @@ class Avc1Box(Mp4FullBox):
         super().__init__(fp, header, parent)
         try:
             self.box_info['num_of_entries'] = read_u32(fp)
-            fp.seek(16, 1)
+            fp.seek(16, os.SEEK_CUR)
             self.box_info['width'] = read_u16(fp)
             self.box_info['height'] = read_u16(fp)
             self.box_info['horizresolution'] = "{0:#010x}".format(read_u32(fp))
             self.box_info['vertresolution'] = "{0:#010x}".format(read_u32(fp))
-            fp.seek(4, 1)
+            fp.seek(4, os.SEEK_CUR)
             self.box_info['frame_count'] = read_u16(fp)
             compressorname_size = read_u8(fp)
             self.box_info['compressorname'] = fp.read(compressorname_size).decode('utf-8', errors="ignore")
@@ -328,7 +329,7 @@ class Mp4aBox(Mp4Box):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(6, 1)
+            fp.seek(6, os.SEEK_CUR)
             self.box_info['reference_index'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_encoding_version'] = "{0:#06x}".format(read_u16(fp))
             self.box_info['audio_encoding_revision'] = "{0:#06x}".format(read_u16(fp))
@@ -366,7 +367,7 @@ class EsdsBox(Mp4FullBox):
                 padding = (padding << 8) + 0x80
             object_dict['preamble'] = hex(padding)
             # read last-read byte again
-            fp.seek(-1, 1)
+            fp.seek(-1, os.SEEK_CUR)
             object_dict['payload_length'] = read_u8(fp)
             object_dict['es_id'] = read_u16(fp)
             object_dict['descriptor_flags'] = read_u8(fp)
@@ -379,7 +380,7 @@ class EsdsBox(Mp4FullBox):
                     padding = (padding << 8) + 0x80
                 this_descriptor_dict['preamble'] = hex(padding)
                 # read last byte
-                fp.seek(-1, 1)
+                fp.seek(-1, os.SEEK_CUR)
                 this_descriptor_dict['payload_length'] = read_u8(fp)
                 payload = fp.read(this_descriptor_dict['payload_length'])
                 if this_descriptor_dict['tag_id'] == 4:
@@ -495,7 +496,7 @@ class DataBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(4, 1)
+            fp.seek(4, os.SEEK_CUR)
             self.box_info['text'] = fp.read(self.size - (self.header.header_size + 8)).decode('utf-8')
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -650,7 +651,7 @@ class IodsBox(Mp4FullBox):
                 padding = (padding << 8) + 0x80
             object_dict['preamble'] = hex(padding)
             # read last-read byte again
-            fp.seek(-1, 1)
+            fp.seek(-1, os.SEEK_CUR)
             object_dict['payload_length'] = read_u8(fp)
             object_dict['od_id'] = read_u16(fp)
             object_dict['od_profile_level'] = read_u8(fp)
