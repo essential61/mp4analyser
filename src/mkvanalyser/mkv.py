@@ -121,7 +121,7 @@ class MkvFile:
                     if len(f.read(4)) != 4:
                         end_of_file = True
                     else:
-                        f.seek(-4, 1)
+                        f.seek(-4, os.SEEK_CUR)
             except DataLengthError:
                 logging.error(f'data length error in {self.filename} after child {len(self.children)}')
             except struct.error as err:
@@ -285,7 +285,7 @@ class MasterElement(MkvElement):
                         # read_id will advance the file pointer until a valid element is found
                         pass
                 if len(fp.read(2)) == 2:
-                    fp.seek(-2, 1)
+                    fp.seek(-2, os.SEEK_CUR)
                 else:
                     end_of_file = True
         except DataLengthError:

@@ -8,6 +8,7 @@ A box_factory function has also been defined, primarily to minimise coupling bet
 """
 import datetime
 import logging
+import os
 
 import mp4analyser.non_iso
 from mp4analyser.core import *
@@ -64,7 +65,7 @@ class Mp4File:
                     if len(f.read(4)) != 4:
                         end_of_file = True
                     else:
-                        f.seek(-4, 1)
+                        f.seek(-4, os.SEEK_CUR)
             f.close()
             self._generate_samples_from_moov()
             self._generate_samples_from_moofs()
@@ -312,12 +313,12 @@ class MetaBox(Mp4Box):
             second_four_bytes = fp.read(4)
             if second_four_bytes.decode('utf-8', errors="ignore") == 'hdlr':
                 # it's non-versioned
-                fp.seek(-8, 1)
+                fp.seek(-8, os.SEEK_CUR)
             else:
                 # it's versioned
                 self.version = first_four_bytes >> 24
                 self.flags = first_four_bytes & 0xFFFFFF
-                fp.seek(-4, 1)
+                fp.seek(-4, os.SEEK_CUR)
                 bytes_left -= 4
             while bytes_left > 7:
                 current_header = Header(fp)
@@ -361,9 +362,9 @@ class MvhdBox(Mp4FullBox):
                 self.box_info['duration'] = read_u32(fp)
             self.box_info['rate'] = read_u16_16(fp)
             self.box_info['volume'] = read_u8_8(fp)
-            fp.seek(10, 1)
+            fp.seek(10, os.SEEK_CUR)
             self.box_info['matrix'] = ["{0:#010x}".format(b) for b in struct.unpack('>9I', fp.read(36))]
-            fp.seek(24, 1)
+            fp.seek(24, os.SEEK_CUR)
             self.box_info['next_track_id'] = read_u32(fp)
         finally:
             fp.seek(self.start_of_box + self.size)
@@ -430,7 +431,7 @@ class TkhdBox(Mp4FullBox):
                 self.box_info['modification_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u64(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['track_ID'] = read_u32(fp)
-                fp.seek(4, 1)
+                fp.seek(4, os.SEEK_CUR)
                 self.box_info['duration'] = read_u64(fp)
             else:
                 self.box_info['creation_time'] = (
@@ -438,13 +439,13 @@ class TkhdBox(Mp4FullBox):
                 self.box_info['modification_time'] = (
                         dt_base + datetime.timedelta(seconds=(read_u32(fp)))).strftime('%Y-%m-%d %H:%M:%S')
                 self.box_info['track_ID'] = read_u32(fp)
-                fp.seek(4, 1)
+                fp.seek(4, os.SEEK_CUR)
                 self.box_info['duration'] = read_u32(fp)
-            fp.seek(8, 1)
+            fp.seek(8, os.SEEK_CUR)
             self.box_info['layer'] = read_i16(fp)
             self.box_info['alternate_group'] = read_i16(fp)
             self.box_info['volume'] = read_u8_8(fp)
-            fp.seek(2, 1)
+            fp.seek(2, os.SEEK_CUR)
             self.box_info['matrix'] = ["{0:#010x}".format(b) for b in struct.unpack('>9I', fp.read(36))]
             self.box_info['width'] = read_u16_16(fp)
             self.box_info['height'] = read_u16_16(fp)
@@ -895,9 +896,9 @@ class HdlrBox(Mp4FullBox):
     def __init__(self, fp, header, parent):
         super().__init__(fp, header, parent)
         try:
-            fp.seek(4, 1)
+            fp.seek(4, os.SEEK_CUR)
             self.box_info['handler_type'] = fp.read(4).decode('utf-8')
-            fp.seek(12, 1)
+            fp.seek(12, os.SEEK_CUR)
             bytes_left = self.size - (self.header.header_size + 25)  # string is null terminated
             self.box_info['name'] = fp.read(bytes_left).decode('utf-8', errors="ignore")
         finally:
@@ -1375,7 +1376,7 @@ class SidxBox(Mp4FullBox):
             else:
                 self.box_info['earliest_presentation_time'] = read_u64(fp)
                 self.box_info['first_offset'] = read_u64(fp)
-            fp.seek(2, 1)
+            fp.seek(2, os.SEEK_CUR)
             self.box_info['reference_count'] = read_u16(fp)
             self.box_info['reference_list'] = []
             for i in range(self.box_info['reference_count']):
