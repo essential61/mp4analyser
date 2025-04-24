@@ -237,7 +237,7 @@ class FtypBox(Mp4Box):
         try:
             self.box_info = {
                 'major_brand': fp.read(4).decode('utf-8'),
-                'minor_version': "{0:#010x}".format(read_u32(fp)),
+                'minor_version': f"{read_u32(fp):#010x}",
                 'compatible_brands': []
             }
             bytes_left = self.size - (self.header.header_size + 8)
@@ -362,7 +362,7 @@ class MvhdBox(Mp4FullBox):
             self.box_info['rate'] = read_u16_16(fp)
             self.box_info['volume'] = read_u8_8(fp)
             fp.seek(10, 1)
-            self.box_info['matrix'] = ["{0:#010x}".format(b) for b in struct.unpack('>9I', fp.read(36))]
+            self.box_info['matrix'] = [f"{b:#010x}" for b in struct.unpack('>9I', fp.read(36))]
             fp.seek(24, 1)
             self.box_info['next_track_id'] = read_u32(fp)
         finally:
@@ -445,7 +445,7 @@ class TkhdBox(Mp4FullBox):
             self.box_info['alternate_group'] = read_i16(fp)
             self.box_info['volume'] = read_u8_8(fp)
             fp.seek(2, 1)
-            self.box_info['matrix'] = ["{0:#010x}".format(b) for b in struct.unpack('>9I', fp.read(36))]
+            self.box_info['matrix'] = [f"{b:#010x}" for b in struct.unpack('>9I', fp.read(36))]
             self.box_info['width'] = read_u16_16(fp)
             self.box_info['height'] = read_u16_16(fp)
         finally:
@@ -467,7 +467,7 @@ class TfhdBox(Mp4FullBox):
             if self.flags  & 0x000010 == 0x000010:
                 self.box_info['default_sample_size'] = read_u32(fp)
             if self.flags  & 0x000020 == 0x000020:
-                self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
+                self.box_info['default_sample_flags'] = f"{read_u32(fp):#08x}"
             self.box_info['duration_is_empty'] = True if self.flags  & 0x010000 == 0x010000 else False
             # depending on value of base data offset this flag mght be ignored
             self.box_info['default_base_is_moof'] = True if self.flags  & 0x020000 == 0x020000 else False
@@ -484,7 +484,7 @@ class TrexBox(Mp4FullBox):
             self.box_info['default_sample_description_index'] = read_u32(fp)
             self.box_info['default_sample_duration'] = read_u32(fp)
             self.box_info['default_sample_size'] = read_u32(fp)
-            self.box_info['default_sample_flags'] = "{0:#08x}".format(read_u32(fp))
+            self.box_info['default_sample_flags'] = f"{read_u32(fp):#08x}"
         finally:
             fp.seek(self.start_of_box + self.size)
 
@@ -770,7 +770,7 @@ class TrunBox(Mp4FullBox):
             if self.flags & 0x000001 == 0x000001:
                 self.box_info['data_offset'] = read_i32(fp)
             if self.flags & 0x000004 == 0x000004:
-                self.box_info['first_sample_flags'] = "{0:#08x}".format(read_u32(fp))
+                self.box_info['first_sample_flags'] = f"{read_u32(fp):#08x}"
             has_sample_duration = True if self.flags & 0x000100 == 0x000100 else False
             has_sample_size = True if self.flags & 0x000200 == 0x000200 else False
             has_sample_flags = True if self.flags & 0x000400 == 0x000400 else False
@@ -783,7 +783,7 @@ class TrunBox(Mp4FullBox):
                 if has_sample_size:
                     sample['sample_size'] = read_u32(fp)
                 if has_sample_flags:
-                    sample['sample_flags'] = "{0:#08x}".format(read_u32(fp))
+                    sample['sample_flags'] = f"{read_u32(fp):#08x}"
                 if has_scto:
                     if self.version == 1:
                         self.box_info['sample_composition_time_offset'] = read_i32(fp)
