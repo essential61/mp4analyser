@@ -204,7 +204,7 @@ class MyApp(Tk):
 
     def open_file(self):
         """ Callback on selecting 'Open' from menu """
-        filename = filedialog.askopenfilename(filetypes=(("All Files", "*.*"), ("MP4 Files", ".mp4 .m4*"),
+        filename = filedialog.askopenfilename(filetypes=(("All Files", "*.*"), ("MP4 Files", ".mp4 .m4s .m4a .m4v"),
                                                          ("MKV Files", ".mkv .webm")), initialdir=self.dialog_dir)
         if not(len(filename)):
             return
