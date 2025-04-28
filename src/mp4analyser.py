@@ -243,7 +243,7 @@ class MyApp(Tk):
             return
         self.containerfile = new_file
         self.dialog_dir, filename_base = os.path.split(self.containerfile.filename)
-        self.title("MP4 Analyser - {0:s}".format(filename_base))
+        self.title(f"MP4 Analyser - {filename_base:s}")
         # Clear tree and text widgets if not empty
         self.tree.delete(*self.tree.get_children())
         self.t.delete(1.0, END)
@@ -346,35 +346,35 @@ class MyApp(Tk):
         mdat = self.containerfile.children[int(mdat_id)]
         for chunk_idx, chunk in enumerate(mdat.sample_list):
             if 'chunk_ID' in chunk:
-                item_text = "track {0}, chunk {1}".format(chunk['track_ID'], chunk['chunk_ID'])
-                self.tree.insert(mdat_id, 'end', "chunk_{0}_mdat_{1}".format(chunk_idx, mdat_id), text=item_text)
+                item_text = "track {}, chunk {}".format(chunk['track_ID'], chunk['chunk_ID'])
+                self.tree.insert(mdat_id, 'end', f"chunk_{chunk_idx}_mdat_{mdat_id}", text=item_text)
                 for sample_idx, sample in enumerate(chunk['chunk_samples']):
-                    item_text = "sample {0}".format(sample['sample_ID'])
-                    self.tree.insert("chunk_{0}_mdat_{1}".format(chunk_idx, mdat_id), 'end',
-                                     "sample_{0}.{1}_mdat_{2}".format(chunk_idx, sample_idx, mdat_id), text=item_text)
+                    item_text = "sample {}".format(sample['sample_ID'])
+                    self.tree.insert(f"chunk_{chunk_idx}_mdat_{mdat_id}", 'end',
+                                     f"sample_{chunk_idx}.{sample_idx}_mdat_{mdat_id}", text=item_text)
             else:  # fragmented mp4 uses term "run" instead of "chunk" but is otherwise same
-                item_text = "track {0}, seq {1}, run {2}".format(chunk['track_ID'], chunk['sequence_number'],
+                item_text = "track {}, seq {}, run {}".format(chunk['track_ID'], chunk['sequence_number'],
                                                                  chunk['run_ID'])
                 self.tree.insert(mdat_id,
                                  'end',
-                                 "chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
+                                 "chunk-{}_{}".format(chunk['sequence_number'], chunk_idx),
                                  text=item_text)
                 for sample_idx, sample in enumerate(chunk['run_samples']):
-                    item_text = "sample {0}".format(sample['sample_ID'])
-                    self.tree.insert("chunk-{0}_{1}".format(chunk['sequence_number'], chunk_idx),
+                    item_text = "sample {}".format(sample['sample_ID'])
+                    self.tree.insert("chunk-{}_{}".format(chunk['sequence_number'], chunk_idx),
                                      'end',
-                                     "sample-{0}_{1}.{2}".format(chunk['sequence_number'], chunk_idx, sample_idx),
+                                     "sample-{}_{}.{}".format(chunk['sequence_number'], chunk_idx, sample_idx),
                                      text=item_text)
 
     def prepare_string_for_text_widget(self, box_selected):
         if type(self.containerfile) == mp4analyser.iso.Mp4File:
             my_string = "Box is {0:d} ({0:#x}) bytes from beginning of file.\n\n".format(box_selected.start_of_box)
-            my_string += "Has header:\n{0:s}\n\n".format(json.dumps(box_selected.header.get_header()))
-            my_string += "Has version: {0:d}\n".format(box_selected.version) if hasattr(box_selected, 'version') else ""
-            my_string += "Has flags: {0:#08x}\n\n".format(box_selected.flags) if hasattr(box_selected, 'flags') else ""
+            my_string += f"Has header:\n{json.dumps(box_selected.header.get_header()):s}\n\n"
+            my_string += f"Has version: {box_selected.version:d}\n" if hasattr(box_selected, 'version') else ""
+            my_string += f"Has flags: {box_selected.flags:#08x}\n\n" if hasattr(box_selected, 'flags') else ""
             if len(box_selected.box_info) > 0:
                 # insertion order is preserved in modern Python
-                my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.box_info, indent=2))
+                my_string += f"Has values:\n{json.dumps(box_selected.box_info, indent=2):s}\n\n"
             if len(box_selected.children) > 0:
                 my_string += "Has child boxes:\n" + json.dumps([box.type for box in box_selected.children])
         else:
@@ -382,20 +382,20 @@ class MyApp(Tk):
             my_string = "Element {0:s} ({1:#x}) is {2:d} ({2:#x}) bytes from beginning of file.\n\n".format(
                 name, box_selected.elementid,
                 box_selected.element_position)
-            my_string += "Data Type: {0:s}\n".format(box_selected.type)
+            my_string += f"Data Type: {box_selected.type:s}\n"
             if box_selected.unknown_datasize:
                 my_string += "Data Length: Unknown\n"
             else:
-                my_string += "Data Length: {0:d} bytes\n".format(box_selected.datasize)
+                my_string += f"Data Length: {box_selected.datasize:d} bytes\n"
             if box_selected.elementid in [0xA1, 0xA3]:
-                my_string += "Has values:\n{0:s}\n\n".format(json.dumps(box_selected.datavalue, indent=2))
+                my_string += f"Has values:\n{json.dumps(box_selected.datavalue, indent=2):s}\n\n"
             else:
                 my_string += "Data Value: " + f'{box_selected.datavalue}' + "\n\n"
             my_string += id_table[box_selected.elementid]['documentation'] if box_selected.elementid in id_table else ""
             if box_selected.elementid in id_table and 'enum' in id_table[box_selected.elementid]:
                 my_string += "\nEnumeration:\n"
                 for k, v in id_table[box_selected.elementid]['enum'].items():
-                    my_string += "{0:d}, {1:s}\n".format(k, v)
+                    my_string += f"{k:d}, {v:s}\n"
         self.populate_text_widget(my_string)
 
     def populate_text_widget(self, the_string):
@@ -424,9 +424,9 @@ class MyApp(Tk):
             hex_string += pretty_hex_line + '\t' + char_line + '\n'
         logging.debug("Hex text processed")
         if trunc:
-            self.thex.insert(END, 'Hex view, showing first {0:d} bytes: \n{1:s}'.format(trunc_size, hex_string))
+            self.thex.insert(END, f'Hex view, showing first {trunc_size:d} bytes: \n{hex_string:s}')
         else:
-            self.thex.insert(END, 'Hex view: \n{0:s}'.format(hex_string))
+            self.thex.insert(END, f'Hex view: \n{hex_string:s}')
 
     def popup_sel(self, e):
         self.popup_focus = e.widget

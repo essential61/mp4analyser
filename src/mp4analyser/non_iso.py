@@ -47,14 +47,14 @@ class Avc1Box(Mp4FullBox):
             fp.seek(16, 1)
             self.box_info['width'] = read_u16(fp)
             self.box_info['height'] = read_u16(fp)
-            self.box_info['horizresolution'] = "{0:#010x}".format(read_u32(fp))
-            self.box_info['vertresolution'] = "{0:#010x}".format(read_u32(fp))
+            self.box_info['horizresolution'] = f"{read_u32(fp):#010x}"
+            self.box_info['vertresolution'] = f"{read_u32(fp):#010x}"
             fp.seek(4, 1)
             self.box_info['frame_count'] = read_u16(fp)
             compressorname_size = read_u8(fp)
             self.box_info['compressorname'] = fp.read(compressorname_size).decode('utf-8', errors="ignore")
             padding = fp.read(31 - compressorname_size)
-            self.box_info['depth'] = "{0:#06x}".format(read_u16(fp))
+            self.box_info['depth'] = f"{read_u16(fp):#06x}"
             self.box_info['pre_defined'] = read_i16(fp)
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
@@ -129,7 +129,7 @@ class HvccBox(Mp4Box):
             self.box_info['general_profile_space'] = profile_info >> 6
             self.box_info['general_tier_flag'] = profile_info >> 5 & 1
             self.box_info['general_profile_idc'] = profile_info & 31
-            self.box_info['general_profile_compatibility_flags'] = "{0:#010x}".format(read_u32(fp))
+            self.box_info['general_profile_compatibility_flags'] = f"{read_u32(fp):#010x}"
             self.box_info['general_constraint_indicator_flags'] = "0x" + binascii.b2a_hex(fp.read(6)).decode('utf-8')
             self.box_info['general_level_idc'] = read_u8(fp)
             self.box_info['min_spatial_segmentation_idc'] = read_u16(fp) % 4096
@@ -329,14 +329,14 @@ class Mp4aBox(Mp4Box):
         super().__init__(fp, header, parent)
         try:
             fp.seek(6, 1)
-            self.box_info['reference_index'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['audio_encoding_version'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['audio_encoding_revision'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['audio_encoding_vendor'] = "{0:#010x}".format(read_u32(fp))
+            self.box_info['reference_index'] = f"{read_u16(fp):#06x}"
+            self.box_info['audio_encoding_version'] = f"{read_u16(fp):#06x}"
+            self.box_info['audio_encoding_revision'] = f"{read_u16(fp):#06x}"
+            self.box_info['audio_encoding_vendor'] = f"{read_u32(fp):#010x}"
             self.box_info['audio_channel_count'] = read_u16(fp)
             self.box_info['audio_sample_size'] = read_u16(fp)
-            self.box_info['audio_compression_id'] = "{0:#06x}".format(read_u16(fp))
-            self.box_info['audio_packet_size'] = "{0:#06x}".format(read_u16(fp))
+            self.box_info['audio_compression_id'] = f"{read_u16(fp):#06x}"
+            self.box_info['audio_packet_size'] = f"{read_u16(fp):#06x}"
             self.box_info['audio_sample_rate'] = read_u16_16(fp)
             # need to check this is correct
             bytes_left = self.start_of_box + self.size - fp.tell()
@@ -615,7 +615,7 @@ class IlstBox(Mp4Box):
             while bytes_left > 7:
                 current_header = Header(fp)
                 if not current_header.type.isprintable():
-                    current_header.type = "#{0:#d}".format(struct.unpack('>I', current_header.type.encode('utf-8'))[0])
+                    current_header.type = "#{:#d}".format(struct.unpack('>I', current_header.type.encode('utf-8'))[0])
                 # create box directly, not through box factory
                 current_box = ItemBox(fp, current_header, self)
                 self.children.append(current_box)
