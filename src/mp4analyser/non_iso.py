@@ -349,7 +349,7 @@ class Mp4aBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-Ac_3Box = Ec_3Box = EncaBox = Mp4aBox
+Ac_3Box = Ec_3Box = Ac_4Box = EncaBox = Mp4aBox
 
 
 class EsdsBox(Mp4FullBox):
