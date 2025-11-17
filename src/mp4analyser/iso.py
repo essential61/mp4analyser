@@ -786,9 +786,9 @@ class TrunBox(Mp4FullBox):
                     sample['sample_flags'] = f"{read_u32(fp):#08x}"
                 if has_scto:
                     if self.version == 1:
-                        self.box_info['sample_composition_time_offset'] = read_i32(fp)
+                        sample['sample_composition_time_offset'] = read_i32(fp)
                     else:
-                        self.box_info['sample_composition_time_offset'] = read_u32(fp)
+                        sample['sample_composition_time_offset'] = read_u32(fp)
                 sample_list.append(sample)
             self.box_info['samples'] = sample_list
         finally:
