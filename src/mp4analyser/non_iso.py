@@ -361,26 +361,39 @@ class EsdsBox(Mp4FullBox):
             #    binascii.b2a_hex(fp.read(self.size - (self.header.header_size + 4))).decode('utf-8')
             object_dict = {}
             object_dict['tag_id'] = read_u8(fp)
-            padding = 0x0
-            while read_u8(fp) == 0x80:
-                padding = (padding << 8) + 0x80
-            object_dict['preamble'] = hex(padding)
-            # read last-read byte again
-            fp.seek(-1, 1)
-            object_dict['payload_length'] = read_u8(fp)
+            # payload_length is big-endian varint
+            length_payload = 0
+            for i in range(4):
+                this_byte = read_u8(fp)
+                length_payload += this_byte & 0x7f
+                if this_byte & 0x80:
+                    length_payload << 7
+                else:
+                    break
+            object_dict['payload_length'] = length_payload
             object_dict['es_id'] = read_u16(fp)
             object_dict['descriptor_flags'] = read_u8(fp)
+            if object_dict['descriptor_flags'] & 0x80:
+                object_dict['depends_on_es_id'] = read_u16(fp)
+            if object_dict['descriptor_flags'] & 0x40:
+                object_dict['url_length'] = read_u8(fp)
+                object_dict['url'] = fp.read(object_dict['url_length']).decode('utf-8')
+            if object_dict['descriptor_flags'] & 0x20:
+                object_dict['ocr_ed_id'] = read_u8(fp)
             object_dict['descriptor_loop'] = []
             # descriptor loop
             while fp.tell() < (self.start_of_box + self.size):
                 this_descriptor_dict = {'tag_id': read_u8(fp)}
-                padding = 0x0
-                while read_u8(fp) == 0x80:
-                    padding = (padding << 8) + 0x80
-                this_descriptor_dict['preamble'] = hex(padding)
-                # read last byte
-                fp.seek(-1, 1)
-                this_descriptor_dict['payload_length'] = read_u8(fp)
+                # payload_length is big-endian varint
+                length_payload = 0
+                for i in range(4):
+                    this_byte = read_u8(fp)
+                    length_payload += this_byte & 0x7f
+                    if this_byte & 0x80:
+                        length_payload << 7
+                    else:
+                        break
+                this_descriptor_dict['payload_length'] = length_payload
                 payload = fp.read(this_descriptor_dict['payload_length'])
                 if this_descriptor_dict['tag_id'] == 4:
                     # it is the elementary stream descriptor
@@ -399,14 +412,19 @@ class EsdsBox(Mp4FullBox):
                     if this_descriptor_dict['specific_info_flag']:
                         # decoder-specific descriptor embedded in es descriptor
                         decoder_specific_dict = {'tag_id': int.from_bytes(payload[13:14], byteorder='big')}
-                        padding = 0x0
                         b = 14
-                        while int.from_bytes(payload[b:b+1], byteorder='big') == 0x80:
-                            padding = (padding << 8) + 0x80
+                        # payload_length is big-endian varint
+                        length_payload = 0
+                        for i in range(4):
+                            this_byte = int.from_bytes(payload[b:b+1], byteorder='big')
+                            length_payload += this_byte & 0x7f
                             b += 1
-                        decoder_specific_dict['preamble'] = hex(padding)
-                        decoder_specific_dict['payload_length'] = int.from_bytes(payload[b:b+1], byteorder='big')
-                        if es_type == 5:
+                            if this_byte & 0x80:
+                                length_payload << 7
+                            else:
+                                break
+                        decoder_specific_dict['payload_length'] = length_payload
+                        if es_type == 0x05 and mp4ra_type == 0x40:
                             two_bytes = int.from_bytes(payload[b+1:b+3], byteorder='big')
                             field_size = 5
                             sound_codec= two_bytes >> (16 - field_size)
@@ -645,13 +663,16 @@ class IodsBox(Mp4FullBox):
         try:
             object_dict = {}
             object_dict['tag_id'] = read_u8(fp)
-            padding = 0x0
-            while read_u8(fp) == 0x80:
-                padding = (padding << 8) + 0x80
-            object_dict['preamble'] = hex(padding)
-            # read last-read byte again
-            fp.seek(-1, 1)
-            object_dict['payload_length'] = read_u8(fp)
+            # payload_length is big-endian varint
+            length_payload = 0
+            for i in range(4):
+                this_byte = read_u8(fp)
+                length_payload += this_byte & 0x7f
+                if this_byte & 0x80:
+                    length_payload << 7
+                else:
+                    break
+            object_dict['payload_length'] = length_payload
             object_dict['od_id'] = read_u16(fp)
             object_dict['od_profile_level'] = read_u8(fp)
             object_dict['scene_profile_level'] = read_u8(fp)
