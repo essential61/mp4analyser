@@ -55,3 +55,13 @@ def read_i8_8(fp):
     return ipart + (fpart / 256)
 
 
+def long_to_double(fp):
+    v = read_u64(fp)
+    if (v > 0x07FF << 52):
+        return 0
+    a = 1 << 52 | v & ((1 << 52) - 1)
+    b = (v >> 52) - 1075
+    if b >= 0:
+        return a * (1 << b)
+    else:
+        return a // (1 << -b)
