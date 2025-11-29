@@ -764,3 +764,14 @@ class XyzBox(Mp4Box):
             self.box_info['data'] = fp.read(self.box_info['data_size']).decode('utf-8', errors="ignore")
         finally:
             fp.seek(self.start_of_box + self.size)
+
+class AmveBox(Mp4Box):
+
+    def __init__(self, fp, header, parent):
+        super().__init__(fp, header, parent)
+        try:
+            self.box_info['ambient_illuminance'] = read_u32(fp)
+            self.box_info['ambient_light_x'] = read_u16(fp)
+            self.box_info['ambient_light_y'] = read_u16(fp)
+        finally:
+            fp.seek(self.start_of_box + self.size)
