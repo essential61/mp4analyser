@@ -508,7 +508,7 @@ class Dec3Box(Mp4Box):
             self.box_info['data_rate'] = my_data_sub >> 3
             self.box_info['num_ind_sub'] = my_data_sub & 7
             self.box_info['ind_sub_list'] = []
-            for i in range(self.box_info['num_ind_sub']):
+            for i in range(self.box_info['num_ind_sub'] + 1):
                 in_s = read_u16(fp)
                 fscod = in_s >> 14
                 bsid = in_s >> 9 & 31
