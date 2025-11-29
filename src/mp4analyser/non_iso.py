@@ -330,15 +330,35 @@ class Mp4aBox(Mp4Box):
         try:
             fp.seek(6, 1)
             self.box_info['reference_index'] = f"{read_u16(fp):#06x}"
-            self.box_info['audio_encoding_version'] = f"{read_u16(fp):#06x}"
+            version = read_u16(fp)
+            self.box_info['audio_encoding_version'] = f"{version:#06x}"
             self.box_info['audio_encoding_revision'] = f"{read_u16(fp):#06x}"
             self.box_info['audio_encoding_vendor'] = f"{read_u32(fp):#010x}"
-            self.box_info['audio_channel_count'] = read_u16(fp)
-            self.box_info['audio_sample_size'] = read_u16(fp)
-            self.box_info['audio_compression_id'] = f"{read_u16(fp):#06x}"
-            self.box_info['audio_packet_size'] = f"{read_u16(fp):#06x}"
-            self.box_info['audio_sample_rate'] = read_u16_16(fp)
-            # need to check this is correct
+            if version != 2:
+                self.box_info['audio_channel_count'] = read_u16(fp)
+                self.box_info['audio_sample_size'] = read_u16(fp)
+                self.box_info['audio_compression_id'] = f"{read_u16(fp):#06x}"
+                self.box_info['audio_packet_size'] = f"{read_u16(fp):#06x}"
+                self.box_info['audio_sample_rate'] = read_u16_16(fp)
+                if version == 1:
+                    self.box_info['audio_samples_per_packet'] = read_u32(fp)
+                    self.box_info['audio_bytes_per_packet'] = read_u32(fp)
+                    self.box_info['audio_bytes_per_frame'] = read_u32(fp)
+                    self.box_info['audio_bytes_per_sample'] = read_u32(fp)
+            else:
+                self.box_info['audio_always3'] = read_u16(fp)
+                self.box_info['audio_always16'] = read_u16(fp)
+                self.box_info['audio_alwaysMinus2'] = read_i16(fp)
+                self.box_info['audio_always0'] = read_i16(fp)
+                self.box_info['audio_always65536'] = read_u32(fp)
+                self.box_info['audio_size_of_struct_only'] = read_u32(fp)
+                self.box_info['audio_sample_rate'] = long_to_double(fp)
+                self.box_info['audio_channel_count'] = read_u32(fp)
+                self.box_info['audio_always7F000000'] = f"{read_u32(fp):#010x}"
+                self.box_info['audio_bits_per_channel'] = read_u32(fp)
+                self.box_info['audio_format_specific_flags'] = read_u32(fp)
+                self.box_info['audio_bytes_per_audio_packet'] = read_u32(fp)
+                self.box_info['audio_LPCM_frames_per_audio_packet'] = read_u32(fp)
             bytes_left = self.start_of_box + self.size - fp.tell()
             while bytes_left > 7:
                 current_header = Header(fp)
@@ -349,7 +369,7 @@ class Mp4aBox(Mp4Box):
             fp.seek(self.start_of_box + self.size)
 
 
-Ac_3Box = Ec_3Box = Ac_4Box = EncaBox = Mp4aBox
+Ac_3Box = Ec_3Box = Ac_4Box = EncaBox = LpcmBox = Mp4aBox
 
 
 class EsdsBox(Mp4FullBox):
