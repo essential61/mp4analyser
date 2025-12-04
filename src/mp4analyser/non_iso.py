@@ -118,6 +118,7 @@ class AvccBox(Mp4Box):
         finally:
             fp.seek(self.start_of_box + self.size)
 
+AvceBox = AvccBox
 
 class HvccBox(Mp4Box):
 
