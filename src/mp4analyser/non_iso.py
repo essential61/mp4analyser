@@ -69,7 +69,7 @@ class Avc1Box(Mp4FullBox):
 DvheBox = Dvh1Box = DvavBox = Dva1Box = Avc1Box
 Hvc1Box = Hev1Box = Av01Box = Avc1Box
 Avc4Box = Avc3Box = Avc2Box = Mp4vBox = Avc1Box
-EncvBox = Vvi1Box = Vvc1Box = Avc1Box
+EncvBox = Vvi1Box = Vvc1Box = Vc_1Box = Avc1Box
 
 
 class AvccBox(Mp4Box):
