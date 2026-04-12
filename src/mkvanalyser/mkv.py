@@ -205,10 +205,10 @@ class BinaryElement(MkvElement):
                     self.datavalue['frames'] = struct.unpack('>B', fp.read(1))[0] + 1
                     self.datavalue['frame lengths'] = []
                     for frame_size in range(self.datavalue['frames'] - 1):
-                        this_frame_sz = 0
-                        while struct.unpack('>B', fp.read(1))[0] == 0xFF:
-                            this_frame_sz += 0xFF
-                        self.datavalue['frame lengths'].append( this_frame_sz + struct.unpack('>B', fp.read(1))[0])
+                        this_frame_sz = struct.unpack('>B', fp.read(1))[0]
+                        while this_frame_sz == 0xFF:
+                            this_frame_sz += struct.unpack('>B', fp.read(1))[0]
+                        self.datavalue['frame lengths'].append( this_frame_sz)
                     last_sz = self.datasize - sum(self.datavalue['frame lengths']) - (fp.tell() - start_of_element_data)
                     self.datavalue['frame lengths'].append(last_sz)
                 elif (blockheaderflags & 0x06) == 6:
